@@ -1,0 +1,10 @@
+fastapi
+numpy
+uvicorn
+geocoder
+pytz
+timezonefinder
+geopy
+python-dateutil
+pyswisseph
+pyjhora

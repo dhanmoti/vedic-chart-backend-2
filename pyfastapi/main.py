@@ -1,44 +1,87 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import os
 import contextlib
+import re
+
+# Astrological Library Imports
 from jhora.horoscope.main import Horoscope
 from jhora.panchanga import drik
-
 import swisseph as swe
 
 app = FastAPI()
 
-from fastapi.middleware.cors import CORSMiddleware
-
+# Enable CORS for mobile app connectivity
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Allows all origins; fine for a public API
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# Ephemeris path setup
 ephe_path = os.path.join(os.getcwd(), "jhora/data/ephe")
 if not os.path.exists(ephe_path):
     print(f"WARNING: Ephemeris path not found at {ephe_path}")
 swe.set_ephe_path(ephe_path)
 
-# Define the data structure
+# --- HELPER LOGIC ---
+class ChartCleaner:
+    @staticmethod
+    def clean_text(text):
+        """Removes astronomical symbols and formatting artifacts."""
+        return re.sub(r'[^\x00-\x7F]+', '', text).replace('\n', ' ').strip()
+
+    @staticmethod
+    def format_response(raw_horoscope):
+        """
+        Transforms raw jhora output:
+        raw_horoscope[0]: Dict of placements (Raasi, Navamsa, etc.)
+        raw_horoscope[1]: List of planet positions for 12 houses across D-charts
+        raw_horoscope[2]: House indices for specific points
+        """
+        # Clean placements (e.g., "Raasi-Sun" instead of "Raasi-Sun☉")
+        placements = {
+            ChartCleaner.clean_text(k): ChartCleaner.clean_text(v) 
+            for k, v in raw_horoscope[0].items()
+        }
+
+        # Map Divisional charts for the UI tabs (Birth, D9, D10 as per wireframe)
+        # 0=D1 (Birth), 8=D9 (Navamsa), 9=D10 (Dasamsa)
+        chart_map = {0: "D1", 8: "D9", 9: "D10"} 
+        formatted_charts = {}
+
+        for idx, name in chart_map.items():
+            if idx < len(raw_horoscope[1]):
+                formatted_charts[name] = [
+                    [ChartCleaner.clean_text(p) for p in house.split('\n') if p.strip()]
+                    for house in raw_horoscope[1][idx]
+                ]
+
+        return {
+            "placements": placements,
+            "charts": formatted_charts,
+            "house_indices": raw_horoscope[2]
+        }
+
+# --- MODELS ---
 class HoroscopeRequest(BaseModel):
-    dob: str  # YYYY-MM-DD
-    time: str # HH:MM
+    dob: str    # YYYY-MM-DD
+    time: str   # HH:MM
     lat: float
     lng: float
     tz: float
     language: str = "en"
 
+# --- ENDPOINTS ---
 @app.post("/horoscope")
 async def get_horoscope(data: HoroscopeRequest):
     try:
-        # Parse date
+        # Parse date components
         year, month, day = [int(part) for part in data.dob.split("-")]
         
-        # Silence library prints and run logic
+        # Silence library prints and execute calculation logic
         with open(os.devnull, 'w') as fnull:
             with contextlib.redirect_stdout(fnull):
                 date_in = drik.Date(year, month, day)
@@ -50,16 +93,22 @@ async def get_horoscope(data: HoroscopeRequest):
                     birth_time=data.time,
                     language=data.language,
                 )
-                horoscope_info = horoscope.get_horoscope_information()
+                raw_info = horoscope.get_horoscope_information()
+        
+        # Clean and structure data for the mobile frontend
+        cleaned_data = ChartCleaner.format_response(raw_info)
         
         return {
             "status": "success",
-            "horoscope": horoscope_info
+            "data": cleaned_data
         }
         
     except Exception as e:
-        print(f"Error processing horoscope: {e}") # This shows up in Cloud Run logs
-        raise HTTPException(status_code=400, detail="Internal processing error. Check input formats.")
+        print(f"Error processing chart: {e}")
+        raise HTTPException(
+            status_code=400, 
+            detail="Failed to generate chart. Please verify date/time format."
+        )
 
 @app.get("/")
 def health_check():

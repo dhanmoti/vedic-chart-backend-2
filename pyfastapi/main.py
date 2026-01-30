@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
+from datetime import date, time
 import os
 import contextlib
 import re
@@ -70,11 +71,50 @@ class ChartCleaner:
 # --- MODELS ---
 class HoroscopeRequest(BaseModel):
     dob: str    # YYYY-MM-DD
-    time: str   # HH:MM
+    time: str   # HH (24-hour)
     lat: float
     lng: float
     tz: float
     language: str = "en"
+
+    @validator("dob")
+    def validate_dob(cls, value):
+        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", value):
+            raise ValueError("dob must match YYYY-MM-DD format")
+        try:
+            date.fromisoformat(value)
+        except ValueError as exc:
+            raise ValueError("dob must be a valid date") from exc
+        return value
+
+    @validator("time")
+    def validate_time(cls, value):
+        if not re.fullmatch(r"\d{2}", value):
+            raise ValueError("time must match HH format")
+        hour = int(value)
+        try:
+            time(hour=hour)
+        except ValueError as exc:
+            raise ValueError("time must be a valid 24-hour time") from exc
+        return value
+
+    @validator("lat")
+    def validate_lat(cls, value):
+        if not -90 <= value <= 90:
+            raise ValueError("lat must be between -90 and 90")
+        return value
+
+    @validator("lng")
+    def validate_lng(cls, value):
+        if not -180 <= value <= 180:
+            raise ValueError("lng must be between -180 and 180")
+        return value
+
+    @validator("tz")
+    def validate_tz(cls, value):
+        if not -14 <= value <= 14:
+            raise ValueError("tz must be between -14 and 14")
+        return value
 
 # --- ENDPOINTS ---
 @app.post("/horoscope")

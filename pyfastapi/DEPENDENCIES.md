@@ -11,7 +11,10 @@
    python -m pip install --upgrade pip-tools
    pip-compile --generate-hashes --output-file requirements.txt requirements.in
    ```
-3. If `pip-tools` is not available in the environment, update `requirements.txt`
+3. Ensure pinned versions remain compatible with the Docker runtime (Python 3.10
+   in `Dockerfile`), especially for packages like NumPy that have strict Python
+   version constraints.
+4. If `pip-tools` is not available in the environment, update `requirements.txt`
    manually by pinning versions (preferably using versions already vetted in a
    trusted environment or existing virtual environment).
 

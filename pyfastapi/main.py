@@ -94,6 +94,7 @@ class HoroscopeRequest(BaseModel):
         hour, minute = (int(part) for part in value.split(":"))
         try:
             time(hour=hour, minute=minute)
+
         except ValueError as exc:
             raise ValueError("time must be a valid 24-hour time") from exc
         return value

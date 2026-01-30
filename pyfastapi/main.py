@@ -6,6 +6,7 @@ import contextlib
 import re
 
 # Astrological Library Imports
+from jhora import const
 from jhora.horoscope.main import Horoscope
 from jhora.panchanga import drik
 import swisseph as swe
@@ -47,17 +48,18 @@ class ChartCleaner:
             for k, v in raw_horoscope[0].items()
         }
 
-        # Map Divisional charts for the UI tabs (Birth, D9, D10 as per wireframe)
-        # 0=D1 (Birth), 8=D9 (Navamsa), 9=D10 (Dasamsa)
-        chart_map = {0: "D1", 8: "D9", 9: "D10"} 
+        # Map divisional charts in the exact order used by Horoscope.get_horoscope_information().
+        # That method builds D1 at index 0, then iterates const.division_chart_factors in order.
+        chart_labels = [f"D{factor}" for factor in const.division_chart_factors]
         formatted_charts = {}
 
-        for idx, name in chart_map.items():
-            if idx < len(raw_horoscope[1]):
-                formatted_charts[name] = [
-                    [ChartCleaner.clean_text(p) for p in house.split('\n') if p.strip()]
-                    for house in raw_horoscope[1][idx]
-                ]
+        for idx, name in enumerate(chart_labels):
+            if idx >= len(raw_horoscope[1]):
+                break
+            formatted_charts[name] = [
+                [ChartCleaner.clean_text(p) for p in house.split('\n') if p.strip()]
+                for house in raw_horoscope[1][idx]
+            ]
 
         return {
             "placements": placements,

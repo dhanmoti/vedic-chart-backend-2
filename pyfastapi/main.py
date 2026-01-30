@@ -71,7 +71,7 @@ class ChartCleaner:
 # --- MODELS ---
 class HoroscopeRequest(BaseModel):
     dob: str    # YYYY-MM-DD
-    time: str   # HH (24-hour)
+    time: str   # HH:MM (24-hour)
     lat: float
     lng: float
     tz: float
@@ -89,11 +89,12 @@ class HoroscopeRequest(BaseModel):
 
     @validator("time")
     def validate_time(cls, value):
-        if not re.fullmatch(r"\d{2}", value):
-            raise ValueError("time must match HH format")
-        hour = int(value)
+        if not re.fullmatch(r"\d{2}:\d{2}", value):
+            raise ValueError("time must match HH:MM format")
+        hour, minute = (int(part) for part in value.split(":"))
         try:
-            time(hour=hour)
+            time(hour=hour, minute=minute)
+
         except ValueError as exc:
             raise ValueError("time must be a valid 24-hour time") from exc
         return value

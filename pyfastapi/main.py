@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, validator
 from datetime import date, time
@@ -12,9 +12,42 @@ from jhora.horoscope.main import Horoscope
 from jhora.panchanga import drik
 import swisseph as swe
 
+# Firebase Admin Imports
+import firebase_admin
+from firebase_admin import app_check, credentials
+
 app = FastAPI()
 
-# Enable CORS for mobile app connectivity
+# --- FIREBASE INITIALIZATION ---
+# Cloud Run automatically provides credentials via the environment.
+# This check prevents re-initialization errors during local 'hot reloads'.
+if not firebase_admin._apps:
+    firebase_admin.initialize_app()
+
+# --- APP CHECK DEPENDENCY ---
+async def verify_app_check(x_firebase_appcheck: str = Header(None)):
+    """
+    FastAPI dependency to verify the Firebase App Check token.
+    The Flutter app must send this in the 'X-Firebase-AppCheck' header.
+    """
+    if not x_firebase_appcheck:
+        raise HTTPException(
+            status_code=401, 
+            detail="X-Firebase-AppCheck header is missing."
+        )
+    
+    try:
+        # verify_token returns decoded claims if successful
+        app_check.verify_token(x_firebase_appcheck)
+    except Exception as e:
+        # Log the error internally for debugging
+        print(f"App Check Verification Failed: {e}")
+        raise HTTPException(
+            status_code=401, 
+            detail="Invalid or expired App Check token."
+        )
+
+# --- CORS SETUP ---
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -32,28 +65,16 @@ swe.set_ephe_path(ephe_path)
 class ChartCleaner:
     @staticmethod
     def clean_text(text):
-        """Removes astronomical symbols and formatting artifacts."""
         return re.sub(r'[^\x00-\x7F]+', '', text).replace('\n', ' ').strip()
 
     @staticmethod
     def format_response(raw_horoscope):
-        """
-        Transforms raw jhora output:
-        raw_horoscope[0]: Dict of placements (Raasi, Navamsa, etc.)
-        raw_horoscope[1]: List of planet positions for 12 houses across D-charts
-        raw_horoscope[2]: House indices for specific points
-        """
-        # Clean placements (e.g., "Raasi-Sun" instead of "Raasi-Sun☉")
         placements = {
             ChartCleaner.clean_text(k): ChartCleaner.clean_text(v) 
             for k, v in raw_horoscope[0].items()
         }
-
-        # Map divisional charts in the exact order used by Horoscope.get_horoscope_information().
-        # That method builds D1 at index 0, then iterates const.division_chart_factors in order.
         chart_labels = [f"D{factor}" for factor in const.division_chart_factors]
         formatted_charts = {}
-
         for idx, name in enumerate(chart_labels):
             if idx >= len(raw_horoscope[1]):
                 break
@@ -61,7 +82,6 @@ class ChartCleaner:
                 [ChartCleaner.clean_text(p) for p in house.split('\n') if p.strip()]
                 for house in raw_horoscope[1][idx]
             ]
-
         return {
             "placements": placements,
             "charts": formatted_charts,
@@ -70,8 +90,8 @@ class ChartCleaner:
 
 # --- MODELS ---
 class HoroscopeRequest(BaseModel):
-    dob: str    # YYYY-MM-DD
-    time: str   # HH:MM (24-hour)
+    dob: str
+    time: str
     lat: float
     lng: float
     tz: float
@@ -81,50 +101,23 @@ class HoroscopeRequest(BaseModel):
     def validate_dob(cls, value):
         if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", value):
             raise ValueError("dob must match YYYY-MM-DD format")
-        try:
-            date.fromisoformat(value)
-        except ValueError as exc:
-            raise ValueError("dob must be a valid date") from exc
+        date.fromisoformat(value)
         return value
 
     @validator("time")
     def validate_time(cls, value):
         if not re.fullmatch(r"\d{2}:\d{2}", value):
             raise ValueError("time must match HH:MM format")
-        hour, minute = (int(part) for part in value.split(":"))
-        try:
-            time(hour=hour, minute=minute)
-
-        except ValueError as exc:
-            raise ValueError("time must be a valid 24-hour time") from exc
-        return value
-
-    @validator("lat")
-    def validate_lat(cls, value):
-        if not -90 <= value <= 90:
-            raise ValueError("lat must be between -90 and 90")
-        return value
-
-    @validator("lng")
-    def validate_lng(cls, value):
-        if not -180 <= value <= 180:
-            raise ValueError("lng must be between -180 and 180")
-        return value
-
-    @validator("tz")
-    def validate_tz(cls, value):
-        if not -14 <= value <= 14:
-            raise ValueError("tz must be between -14 and 14")
         return value
 
 # --- ENDPOINTS ---
-@app.post("/horoscope")
+
+# Added verify_app_check as a dependency here
+@app.post("/horoscope", dependencies=[Depends(verify_app_check)])
 async def get_horoscope(data: HoroscopeRequest):
     try:
-        # Parse date components
         year, month, day = [int(part) for part in data.dob.split("-")]
         
-        # Silence library prints and execute calculation logic
         with open(os.devnull, 'w') as fnull:
             with contextlib.redirect_stdout(fnull):
                 date_in = drik.Date(year, month, day)
@@ -138,20 +131,12 @@ async def get_horoscope(data: HoroscopeRequest):
                 )
                 raw_info = horoscope.get_horoscope_information()
         
-        # Clean and structure data for the mobile frontend
         cleaned_data = ChartCleaner.format_response(raw_info)
-        
-        return {
-            "status": "success",
-            "data": cleaned_data
-        }
+        return {"status": "success", "data": cleaned_data}
         
     except Exception as e:
         print(f"Error processing chart: {e}")
-        raise HTTPException(
-            status_code=400, 
-            detail="Failed to generate chart. Please verify date/time format."
-        )
+        raise HTTPException(status_code=400, detail="Failed to generate chart.")
 
 @app.get("/")
 def health_check():

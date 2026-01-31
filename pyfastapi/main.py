@@ -1,94 +1,133 @@
 from fastapi import FastAPI, HTTPException, Header, Depends
-from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, validator
-from datetime import date, time
+from datetime import date
 import os
 import contextlib
 import re
+import logging
+import traceback
 
-# Astrological Library Imports
+# --- Astrological Library Imports ---
 from jhora import const
 from jhora.horoscope.main import Horoscope
 from jhora.panchanga import drik
 import swisseph as swe
 
-# Firebase Admin Imports
+# --- Firebase Admin Imports ---
 import firebase_admin
-from firebase_admin import app_check, credentials
+from firebase_admin import app_check
+from firebase_admin import exceptions as firebase_exceptions
 
+
+# -------------------------------------------------------------------
+# App & Logging Setup
+# -------------------------------------------------------------------
 app = FastAPI()
 
-# --- FIREBASE INITIALIZATION ---
-# Cloud Run automatically provides credentials via the environment.
-# This check prevents re-initialization errors during local 'hot reloads'.
+logger = logging.getLogger("uvicorn.error")
+logger.setLevel(logging.INFO)
+
+# -------------------------------------------------------------------
+# Firebase Initialization (Cloud Run friendly)
+# -------------------------------------------------------------------
 if not firebase_admin._apps:
     firebase_admin.initialize_app()
 
-# --- APP CHECK DEPENDENCY ---
-async def verify_app_check(x_firebase_appcheck: str = Header(None)):
+# -------------------------------------------------------------------
+# App Check Dependency
+# -------------------------------------------------------------------
+async def verify_app_check(
+    token: str = Header(None, alias="X-Firebase-AppCheck")
+):
     """
-    FastAPI dependency to verify the Firebase App Check token.
-    The Flutter app must send this in the 'X-Firebase-AppCheck' header.
+    Verifies Firebase App Check token.
+    Required for all protected endpoints.
     """
-    if not x_firebase_appcheck:
+    if not token:
         raise HTTPException(
-            status_code=401, 
+            status_code=401,
             detail="X-Firebase-AppCheck header is missing."
         )
-    
+
     try:
-        # verify_token returns decoded claims if successful
-        app_check.verify_token(x_firebase_appcheck)
-    except Exception as e:
-        # Log the error internally for debugging
-        print(f"App Check Verification Failed: {e}")
+        claims = app_check.verify_token(token)
+        return claims
+    except firebase_exceptions.FirebaseError as e:
+        logger.warning(
+            "App Check FirebaseError: %s | %s",
+            e.code,
+            e.message
+        )
         raise HTTPException(
-            status_code=401, 
-            detail="Invalid or expired App Check token."
+            status_code=401,
+            detail="Invalid App Check token."
+        )
+    except Exception as e:
+        logger.error(
+            "App Check Unknown Error: %s\n%s",
+            repr(e),
+            traceback.format_exc()
+        )
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid App Check token."
         )
 
-# --- CORS SETUP ---
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# -------------------------------------------------------------------
+# Ephemeris Path Setup (Container-safe)
+# -------------------------------------------------------------------
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+ephe_path = os.path.join(BASE_DIR, "jhora", "data", "ephe")
 
-# Ephemeris path setup
-ephe_path = os.path.join(os.getcwd(), "jhora/data/ephe")
 if not os.path.exists(ephe_path):
-    print(f"WARNING: Ephemeris path not found at {ephe_path}")
+    logger.error("Ephemeris path not found: %s", ephe_path)
+    raise RuntimeError("Swiss Ephemeris data not found")
+
 swe.set_ephe_path(ephe_path)
 
-# --- HELPER LOGIC ---
+# -------------------------------------------------------------------
+# Helper Logic
+# -------------------------------------------------------------------
 class ChartCleaner:
     @staticmethod
-    def clean_text(text):
-        return re.sub(r'[^\x00-\x7F]+', '', text).replace('\n', ' ').strip()
+    def clean_text(text: str) -> str:
+        return (
+            re.sub(r"[^\x00-\x7F]+", "", text)
+            .replace("\n", " ")
+            .strip()
+        )
 
     @staticmethod
     def format_response(raw_horoscope):
         placements = {
-            ChartCleaner.clean_text(k): ChartCleaner.clean_text(v) 
+            ChartCleaner.clean_text(k): ChartCleaner.clean_text(v)
             for k, v in raw_horoscope[0].items()
         }
+
         chart_labels = [f"D{factor}" for factor in const.division_chart_factors]
         formatted_charts = {}
+
         for idx, name in enumerate(chart_labels):
             if idx >= len(raw_horoscope[1]):
                 break
             formatted_charts[name] = [
-                [ChartCleaner.clean_text(p) for p in house.split('\n') if p.strip()]
+                [
+                    ChartCleaner.clean_text(p)
+                    for p in house.split("\n")
+                    if p.strip()
+                ]
                 for house in raw_horoscope[1][idx]
             ]
+
         return {
             "placements": placements,
             "charts": formatted_charts,
-            "house_indices": raw_horoscope[2]
+            "house_indices": raw_horoscope[2],
         }
 
-# --- MODELS ---
+# -------------------------------------------------------------------
+# Request Models
+# -------------------------------------------------------------------
 class HoroscopeRequest(BaseModel):
     dob: str
     time: str
@@ -110,15 +149,19 @@ class HoroscopeRequest(BaseModel):
             raise ValueError("time must match HH:MM format")
         return value
 
-# --- ENDPOINTS ---
-
-# Added verify_app_check as a dependency here
-@app.post("/horoscope", dependencies=[Depends(verify_app_check)])
-async def get_horoscope(data: HoroscopeRequest):
+# -------------------------------------------------------------------
+# Endpoints
+# -------------------------------------------------------------------
+@app.post("/horoscope")
+async def get_horoscope(
+    data: HoroscopeRequest,
+    app_check_claims=Depends(verify_app_check),
+):
     try:
-        year, month, day = [int(part) for part in data.dob.split("-")]
-        
-        with open(os.devnull, 'w') as fnull:
+        year, month, day = [int(p) for p in data.dob.split("-")]
+
+        # Silence noisy stdout from jhora
+        with open(os.devnull, "w") as fnull:
             with contextlib.redirect_stdout(fnull):
                 date_in = drik.Date(year, month, day)
                 horoscope = Horoscope(
@@ -130,13 +173,26 @@ async def get_horoscope(data: HoroscopeRequest):
                     language=data.language,
                 )
                 raw_info = horoscope.get_horoscope_information()
-        
+
         cleaned_data = ChartCleaner.format_response(raw_info)
         return {"status": "success", "data": cleaned_data}
-        
+
+    except ValueError as e:
+        logger.warning("Invalid input: %s", e)
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid input parameters."
+        )
     except Exception as e:
-        print(f"Error processing chart: {e}")
-        raise HTTPException(status_code=400, detail="Failed to generate chart.")
+        logger.error(
+            "Chart generation failed: %s\n%s",
+            e,
+            traceback.format_exc()
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Internal error generating chart."
+        )
 
 @app.get("/")
 def health_check():

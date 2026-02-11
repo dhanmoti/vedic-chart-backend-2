@@ -162,6 +162,8 @@ class HoroscopeData(BaseModel):
     placements: Dict[str, str]
     charts: Dict[str, List[List[str]]]
     house_indices: List[int]
+    ascendant_lord: Optional[str]
+    ascendant_nakshatra: Optional[NakshatraInfo]
     nakshatras: Dict[str, Optional[NakshatraInfo]]
 
 
@@ -177,7 +179,7 @@ class HoroscopeResponse(BaseModel):
     response_model=HoroscopeResponse,
     responses={
         200: {
-            "description": "Generated horoscope data with divisional charts and nakshatras for all supported grahas.",
+            "description": "Generated horoscope data with divisional charts, ascendant details, and nakshatras for all supported grahas.",
             "content": {
                 "application/json": {
                     "example": {
@@ -194,7 +196,10 @@ class HoroscopeResponse(BaseModel):
                                 ]
                             },
                             "house_indices": [10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+                            "ascendant_lord": "Saturn",
+                            "ascendant_nakshatra": {"name": "Shatabhisha", "pada": 1, "lord": "Rahu"},
                             "nakshatras": {
+                                "Raasi-Lagna": {"name": "Shatabhisha", "pada": 1, "lord": "Rahu"},
                                 "Raasi-Sun": {"name": "Uttara Ashadha", "pada": 3, "lord": "Sun"},
                                 "Raasi-Moon": {"name": "Shravana", "pada": 2, "lord": "Moon"},
                                 "Raasi-Mars": {"name": "Chitra", "pada": 1, "lord": "Mars"},
@@ -237,6 +242,8 @@ async def get_horoscope(
                 raw_info = horoscope.get_horoscope_information()
 
         cleaned_data = ChartCleaner.format_response(raw_info)
+        cleaned_data["ascendant_lord"] = None
+        cleaned_data["ascendant_nakshatra"] = None
         graha_labels = {
             const._SUN: "Sun",
             const._MOON: "Moon",
@@ -252,12 +259,46 @@ async def get_horoscope(
             f"Raasi-{label}": None
             for label in graha_labels.values()
         }
+        cleaned_data["nakshatras"]["Raasi-Lagna"] = None
 
         with open(os.devnull, "w") as fnull:
             with contextlib.redirect_stdout(fnull):
                 try:
                     utils.set_language(data.language)
                     jd_utc = birth_julian_day - (place.timezone / 24.0)
+
+                    try:
+                        asc_sign, _asc_longitude, asc_nakshatra_index, asc_pada = drik.ascendant(
+                            jd_utc,
+                            place,
+                        )
+                        asc_lord_index = int(const.house_owners[asc_sign])
+                        cleaned_data["ascendant_lord"] = ChartCleaner.clean_text(
+                            utils.PLANET_NAMES[asc_lord_index]
+                        )
+                        asc_nakshatra_name = ChartCleaner.clean_text(
+                            utils.NAKSHATRA_LIST[asc_nakshatra_index - 1]
+                        )
+                        asc_nakshatra_lord_index = utils.nakshathra_lord(asc_nakshatra_index)
+                        asc_nakshatra_lord_name = ChartCleaner.clean_text(
+                            utils.PLANET_NAMES[asc_nakshatra_lord_index]
+                        )
+                        cleaned_data["ascendant_nakshatra"] = {
+                            "name": asc_nakshatra_name,
+                            "pada": asc_pada,
+                            "lord": asc_nakshatra_lord_name,
+                        }
+                        cleaned_data["nakshatras"]["Raasi-Lagna"] = {
+                            "name": asc_nakshatra_name,
+                            "pada": asc_pada,
+                            "lord": asc_nakshatra_lord_name,
+                        }
+                    except Exception as ascendant_exception:
+                        logger.warning(
+                            "Could not compute ascendant details: %s",
+                            ascendant_exception,
+                        )
+
                     for planet_id in drik.planet_list:
                         label = f"Raasi-{graha_labels.get(planet_id, str(planet_id))}"
                         try:

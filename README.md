@@ -8,7 +8,7 @@ This project uses the Swiss Ephemeris under the Swiss Ephemeris Free License and
 
 ### `POST /horoscope`
 
-Generates horoscope placements/charts and includes nakshatra + pada + nakshatra lord for all supported grahas (Sun, Moon, Mars, Mercury, Jupiter, Venus, Saturn, Rahu, Ketu).
+Generates horoscope placements/charts and includes ascendant lord, ascendant nakshatra, and nakshatra + pada + nakshatra lord for Lagna and all supported grahas (Sun, Moon, Mars, Mercury, Jupiter, Venus, Saturn, Rahu, Ketu).
 
 #### Response shape (200)
 
@@ -27,7 +27,10 @@ Generates horoscope placements/charts and includes nakshatra + pada + nakshatra 
       ]
     },
     "house_indices": [10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+    "ascendant_lord": "Saturn",
+    "ascendant_nakshatra": { "name": "Shatabhisha", "pada": 1, "lord": "Rahu" },
     "nakshatras": {
+      "Raasi-Lagna": { "name": "Shatabhisha", "pada": 1, "lord": "Rahu" },
       "Raasi-Sun": { "name": "Uttara Ashadha", "pada": 3, "lord": "Sun" },
       "Raasi-Moon": { "name": "Shravana", "pada": 2, "lord": "Moon" },
       "Raasi-Mars": { "name": "Chitra", "pada": 1, "lord": "Mars" },
@@ -42,4 +45,4 @@ Generates horoscope placements/charts and includes nakshatra + pada + nakshatra 
 }
 ```
 
-If a planet's nakshatra computation cannot be completed, that specific `Raasi-*` field is returned as `null` and the request still succeeds.
+If ascendant or planet nakshatra computation cannot be completed, those specific fields are returned as `null` and the request still succeeds.

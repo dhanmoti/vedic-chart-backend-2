@@ -142,6 +142,74 @@ class ChartCleaner:
             "house_indices": raw_horoscope[2],
         }
 
+
+_SIGN_TO_INDEX = {
+    "Aries": 0,
+    "Taurus": 1,
+    "Gemini": 2,
+    "Cancer": 3,
+    "Leo": 4,
+    "Virgo": 5,
+    "Libra": 6,
+    "Scorpio": 7,
+    "Sagittarius": 8,
+    "Capricorn": 9,
+    "Aquarius": 10,
+    "Pisces": 11,
+}
+
+
+def _parse_longitude_from_placement(placement_value: str) -> Optional[float]:
+    match = re.search(
+        r"\b(Aries|Taurus|Gemini|Cancer|Leo|Virgo|Libra|Scorpio|Sagittarius|Capricorn|Aquarius|Pisces)\s+(\d{1,2})\s+(\d{1,2})(?:\s+(\d{1,2}))?",
+        placement_value,
+    )
+    if not match:
+        return None
+
+    sign_name = match.group(1)
+    sign_index = _SIGN_TO_INDEX[sign_name]
+    degrees = int(match.group(2))
+    minutes = int(match.group(3))
+    seconds = int(match.group(4) or 0)
+    sign_offset = degrees + (minutes / 60.0) + (seconds / 3600.0)
+    return sign_index * 30.0 + sign_offset
+
+
+def _extract_longitude_map(placements: Dict[str, str]) -> Dict[str, float]:
+    aliases = {
+        "Raasi-Lagna": ["Raasi-Ascendant", "Raasi-Lagna"],
+        "Raasi-Sun": ["Raasi-Sun"],
+        "Raasi-Moon": ["Raasi-Moon"],
+        "Raasi-Mars": ["Raasi-Mars"],
+        "Raasi-Mercury": ["Raasi-Mercury"],
+        "Raasi-Jupiter": ["Raasi-Jupiter"],
+        "Raasi-Venus": ["Raasi-Venus"],
+        "Raasi-Saturn": ["Raasi-Saturn"],
+        "Raasi-Rahu": ["Raasi-Rahu", "Raasi-Raagu"],
+        "Raasi-Ketu": ["Raasi-Ketu", "Raasi-Kethu"],
+    }
+
+    longitude_map: Dict[str, float] = {}
+    for normalized_label, candidates in aliases.items():
+        for candidate in candidates:
+            placement_value = placements.get(candidate)
+            if not placement_value:
+                continue
+            longitude = _parse_longitude_from_placement(placement_value)
+            if longitude is not None:
+                longitude_map[normalized_label] = longitude
+                break
+
+    rahu_longitude = longitude_map.get("Raasi-Rahu")
+    ketu_longitude = longitude_map.get("Raasi-Ketu")
+    if rahu_longitude is not None and ketu_longitude is None:
+        longitude_map["Raasi-Ketu"] = (rahu_longitude + 180.0) % 360.0
+    elif ketu_longitude is not None and rahu_longitude is None:
+        longitude_map["Raasi-Rahu"] = (ketu_longitude + 180.0) % 360.0
+
+    return longitude_map
+
 # -------------------------------------------------------------------
 # Request Models
 # -------------------------------------------------------------------
@@ -208,6 +276,7 @@ def _build_horoscope_payload(data: HoroscopeRequest) -> Dict[str, object]:
             raw_info = horoscope.get_horoscope_information()
 
     cleaned_data = ChartCleaner.format_response(raw_info)
+    longitude_map = _extract_longitude_map(cleaned_data["placements"])
     cleaned_data["ascendant_lord"] = None
     cleaned_data["ascendant_nakshatra"] = None
     graha_labels = {
@@ -234,31 +303,24 @@ def _build_horoscope_payload(data: HoroscopeRequest) -> Dict[str, object]:
                 jd_utc = birth_julian_day - (place.timezone / 24.0)
 
                 try:
-                    asc_sign, _asc_longitude, asc_nakshatra_index, asc_pada = drik.ascendant(
-                        jd_utc,
-                        place,
-                    )
+                    asc_longitude = longitude_map.get("Raasi-Lagna")
+                    if asc_longitude is None:
+                        _asc_sign, asc_longitude, _, _ = drik.ascendant(jd_utc, place)
+                    asc_sign = int(asc_longitude // 30)
                     asc_lord_index = int(const.house_owners[asc_sign])
-                    cleaned_data["ascendant_lord"] = ChartCleaner.clean_text(
-                        utils.PLANET_NAMES[asc_lord_index]
-                    )
-                    asc_nakshatra_name = ChartCleaner.clean_text(
-                        utils.NAKSHATRA_LIST[asc_nakshatra_index - 1]
-                    )
+                    cleaned_data["ascendant_lord"] = ChartCleaner.clean_text(utils.PLANET_NAMES[asc_lord_index])
+
+                    asc_nakshatra_index, asc_pada, _ = drik.nakshatra_pada(asc_longitude)
+                    asc_nakshatra_name = ChartCleaner.clean_text(utils.NAKSHATRA_LIST[asc_nakshatra_index - 1])
                     asc_nakshatra_lord_index = utils.nakshathra_lord(asc_nakshatra_index)
-                    asc_nakshatra_lord_name = ChartCleaner.clean_text(
-                        utils.PLANET_NAMES[asc_nakshatra_lord_index]
-                    )
-                    cleaned_data["ascendant_nakshatra"] = {
+                    asc_nakshatra_lord_name = ChartCleaner.clean_text(utils.PLANET_NAMES[asc_nakshatra_lord_index])
+                    asc_nakshatra_payload = {
                         "name": asc_nakshatra_name,
                         "pada": asc_pada,
                         "lord": asc_nakshatra_lord_name,
                     }
-                    cleaned_data["nakshatras"]["Raasi-Lagna"] = {
-                        "name": asc_nakshatra_name,
-                        "pada": asc_pada,
-                        "lord": asc_nakshatra_lord_name,
-                    }
+                    cleaned_data["ascendant_nakshatra"] = asc_nakshatra_payload
+                    cleaned_data["nakshatras"]["Raasi-Lagna"] = asc_nakshatra_payload
                 except Exception as ascendant_exception:
                     logger.warning(
                         "Could not compute ascendant details: %s",
@@ -268,11 +330,16 @@ def _build_horoscope_payload(data: HoroscopeRequest) -> Dict[str, object]:
                 for planet_id in drik.planet_list:
                     label = f"Raasi-{graha_labels.get(planet_id, str(planet_id))}"
                     try:
-                        if planet_id == const._KETU:
-                            rahu_longitude = drik.sidereal_longitude(jd_utc, const._RAHU)
+                        longitude = longitude_map.get(label)
+                        if longitude is None and planet_id == const._KETU:
+                            rahu_longitude = longitude_map.get("Raasi-Rahu")
+                            if rahu_longitude is None:
+                                rahu_longitude = drik.sidereal_longitude(jd_utc, const._RAHU)
+                                longitude_map["Raasi-Rahu"] = rahu_longitude
                             longitude = (rahu_longitude + 180.0) % 360.0
-                        else:
+                        elif longitude is None:
                             longitude = drik.sidereal_longitude(jd_utc, planet_id)
+                        longitude_map[label] = longitude
                         nakshatra_index, pada, _ = drik.nakshatra_pada(longitude)
                         nakshatra_name = ChartCleaner.clean_text(
                             utils.NAKSHATRA_LIST[nakshatra_index - 1]

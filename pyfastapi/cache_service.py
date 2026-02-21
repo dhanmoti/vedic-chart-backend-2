@@ -1,4 +1,5 @@
 import json
+import hashlib
 import logging
 import os
 import threading
@@ -174,31 +175,39 @@ class HoroscopeCacheService:
         normalized_json = json.dumps(normalized_fields, sort_keys=True, separators=(",", ":"))
         return f"{self.config.key_prefix}:{normalized_json}"
 
+    @staticmethod
+    def _obfuscated_key(cache_key: str) -> str:
+        key_hash = hashlib.sha256(cache_key.encode("utf-8")).hexdigest()[:12]
+        key_prefix = cache_key.split(":", 1)[0]
+        return f"{key_prefix}:{key_hash}"
+
     def get(self, cache_key: str) -> Optional[Dict[str, Any]]:
+        safe_key = self._obfuscated_key(cache_key)
         try:
             cached = self._backend.get(cache_key)
             if cached is None:
                 self.metrics.miss()
-                logger.info("cache_lookup status=miss backend=%s key=%s", self.config.backend, cache_key)
+                logger.debug("cache_lookup status=miss backend=%s key=%s", self.config.backend, safe_key)
                 return None
             self.metrics.hit()
-            logger.info("cache_lookup status=hit backend=%s key=%s", self.config.backend, cache_key)
+            logger.debug("cache_lookup status=hit backend=%s key=%s", self.config.backend, safe_key)
             return cached
         except Exception as cache_error:
             self.metrics.error()
-            logger.warning("cache_lookup status=error key=%s error=%s", cache_key, cache_error)
+            logger.warning("cache_lookup status=error key=%s error=%s", safe_key, cache_error)
             return None
 
     def set(self, cache_key: str, payload: Dict[str, Any]) -> None:
+        safe_key = self._obfuscated_key(cache_key)
         try:
             self._backend.set(cache_key, payload, self.config.ttl_seconds)
             self.metrics.write()
-            logger.info(
+            logger.debug(
                 "cache_store status=ok backend=%s ttl=%s key=%s",
                 self.config.backend,
                 self.config.ttl_seconds,
-                cache_key,
+                safe_key,
             )
         except Exception as cache_error:
             self.metrics.error()
-            logger.warning("cache_store status=error key=%s error=%s", cache_key, cache_error)
+            logger.warning("cache_store status=error key=%s error=%s", safe_key, cache_error)

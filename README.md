@@ -71,6 +71,16 @@ CACHE_BACKEND=memory
 
 This remains the default when `CACHE_BACKEND` is unset.
 
+### Cloud Run scaling and cost profile
+
+Use the locked deployment profile and benchmark workflow in [`docs/cloud-run-tuning.md`](docs/cloud-run-tuning.md). Deploy with explicit Cloud Run flags via:
+
+```bash
+./deploy/cloud_run_deploy.sh
+```
+
+This keeps `--concurrency`, `--cpu`, `--memory`, `--min-instances`, and `--max-instances` explicit and versioned.
+
 ### Metrics and rollout validation
 
 Track `GET /metrics/cache` before and after rollout and compare:

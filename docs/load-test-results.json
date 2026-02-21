@@ -1,0 +1,44 @@
+[
+  {
+    "profile": "cpu1-mem1g-conc1",
+    "cpu": 1.0,
+    "memory_gib": 1.0,
+    "concurrency": 1,
+    "min_instances": 0,
+    "max_instances": 10,
+    "requests": 200,
+    "successes": 200,
+    "failures": 0,
+    "avg_latency_ms": 18.47,
+    "p95_latency_ms": 29.08,
+    "cost_per_1k_usd": 0.0009
+  },
+  {
+    "profile": "cpu1-mem1g-conc2",
+    "cpu": 1.0,
+    "memory_gib": 1.0,
+    "concurrency": 2,
+    "min_instances": 0,
+    "max_instances": 20,
+    "requests": 200,
+    "successes": 200,
+    "failures": 0,
+    "avg_latency_ms": 29.89,
+    "p95_latency_ms": 40.72,
+    "cost_per_1k_usd": 0.0008
+  },
+  {
+    "profile": "cpu2-mem2g-conc4",
+    "cpu": 2.0,
+    "memory_gib": 2.0,
+    "concurrency": 4,
+    "min_instances": 0,
+    "max_instances": 20,
+    "requests": 200,
+    "successes": 200,
+    "failures": 0,
+    "avg_latency_ms": 57.21,
+    "p95_latency_ms": 81.56,
+    "cost_per_1k_usd": 0.0012
+  }
+]

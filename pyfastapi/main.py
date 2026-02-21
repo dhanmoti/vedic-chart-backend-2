@@ -9,6 +9,7 @@ import re
 import logging
 import traceback
 import time
+import atexit
 
 # --- Astrological Library Imports ---
 from jhora import const
@@ -30,6 +31,18 @@ app = FastAPI()
 
 logger = logging.getLogger("uvicorn.error")
 logger.setLevel(logging.INFO)
+
+for noisy_logger_name in ("jhora", "swisseph"):
+    logging.getLogger(noisy_logger_name).setLevel(logging.WARNING)
+
+_DEVNULL_WRITER = open(os.devnull, "w")
+atexit.register(_DEVNULL_WRITER.close)
+
+
+@contextlib.contextmanager
+def suppress_third_party_stdout():
+    with contextlib.redirect_stdout(_DEVNULL_WRITER):
+        yield
 
 # -------------------------------------------------------------------
 # Firebase Initialization (Cloud Run friendly)
@@ -262,18 +275,17 @@ def _build_horoscope_payload(data: HoroscopeRequest) -> Dict[str, object]:
     place = drik.Place("Birth Place", data.lat, data.lng, data.tz)
     birth_julian_day = utils.julian_day_number(date_in, (hour, minute, 0))
 
-    # Silence noisy stdout from jhora
-    with open(os.devnull, "w") as fnull:
-        with contextlib.redirect_stdout(fnull):
-            horoscope = Horoscope(
-                latitude=data.lat,
-                longitude=data.lng,
-                timezone_offset=data.tz,
-                date_in=date_in,
-                birth_time=data.time,
-                language=data.language,
-            )
-            raw_info = horoscope.get_horoscope_information()
+    with suppress_third_party_stdout():
+        horoscope = Horoscope(
+            latitude=data.lat,
+            longitude=data.lng,
+            timezone_offset=data.tz,
+            date_in=date_in,
+            birth_time=data.time,
+            language=data.language,
+        )
+    with suppress_third_party_stdout():
+        raw_info = horoscope.get_horoscope_information()
 
     cleaned_data = ChartCleaner.format_response(raw_info)
     longitude_map = _extract_longitude_map(cleaned_data["placements"])
@@ -296,74 +308,76 @@ def _build_horoscope_payload(data: HoroscopeRequest) -> Dict[str, object]:
     }
     cleaned_data["nakshatras"]["Raasi-Lagna"] = None
 
-    with open(os.devnull, "w") as fnull:
-        with contextlib.redirect_stdout(fnull):
+    try:
+        with suppress_third_party_stdout():
+            utils.set_language(data.language)
+        jd_utc = birth_julian_day - (place.timezone / 24.0)
+
+        try:
+            asc_longitude = longitude_map.get("Raasi-Lagna")
+            if asc_longitude is None:
+                with suppress_third_party_stdout():
+                    _asc_sign, asc_longitude, _, _ = drik.ascendant(jd_utc, place)
+            asc_sign = int(asc_longitude // 30)
+            asc_lord_index = int(const.house_owners[asc_sign])
+            cleaned_data["ascendant_lord"] = ChartCleaner.clean_text(utils.PLANET_NAMES[asc_lord_index])
+
+            asc_nakshatra_index, asc_pada, _ = drik.nakshatra_pada(asc_longitude)
+            asc_nakshatra_name = ChartCleaner.clean_text(utils.NAKSHATRA_LIST[asc_nakshatra_index - 1])
+            asc_nakshatra_lord_index = utils.nakshathra_lord(asc_nakshatra_index)
+            asc_nakshatra_lord_name = ChartCleaner.clean_text(utils.PLANET_NAMES[asc_nakshatra_lord_index])
+            asc_nakshatra_payload = {
+                "name": asc_nakshatra_name,
+                "pada": asc_pada,
+                "lord": asc_nakshatra_lord_name,
+            }
+            cleaned_data["ascendant_nakshatra"] = asc_nakshatra_payload
+            cleaned_data["nakshatras"]["Raasi-Lagna"] = asc_nakshatra_payload
+        except Exception as ascendant_exception:
+            logger.warning(
+                "Could not compute ascendant details: %s",
+                ascendant_exception,
+            )
+
+        for planet_id in drik.planet_list:
+            label = f"Raasi-{graha_labels.get(planet_id, str(planet_id))}"
             try:
-                utils.set_language(data.language)
-                jd_utc = birth_julian_day - (place.timezone / 24.0)
-
-                try:
-                    asc_longitude = longitude_map.get("Raasi-Lagna")
-                    if asc_longitude is None:
-                        _asc_sign, asc_longitude, _, _ = drik.ascendant(jd_utc, place)
-                    asc_sign = int(asc_longitude // 30)
-                    asc_lord_index = int(const.house_owners[asc_sign])
-                    cleaned_data["ascendant_lord"] = ChartCleaner.clean_text(utils.PLANET_NAMES[asc_lord_index])
-
-                    asc_nakshatra_index, asc_pada, _ = drik.nakshatra_pada(asc_longitude)
-                    asc_nakshatra_name = ChartCleaner.clean_text(utils.NAKSHATRA_LIST[asc_nakshatra_index - 1])
-                    asc_nakshatra_lord_index = utils.nakshathra_lord(asc_nakshatra_index)
-                    asc_nakshatra_lord_name = ChartCleaner.clean_text(utils.PLANET_NAMES[asc_nakshatra_lord_index])
-                    asc_nakshatra_payload = {
-                        "name": asc_nakshatra_name,
-                        "pada": asc_pada,
-                        "lord": asc_nakshatra_lord_name,
-                    }
-                    cleaned_data["ascendant_nakshatra"] = asc_nakshatra_payload
-                    cleaned_data["nakshatras"]["Raasi-Lagna"] = asc_nakshatra_payload
-                except Exception as ascendant_exception:
-                    logger.warning(
-                        "Could not compute ascendant details: %s",
-                        ascendant_exception,
-                    )
-
-                for planet_id in drik.planet_list:
-                    label = f"Raasi-{graha_labels.get(planet_id, str(planet_id))}"
-                    try:
-                        longitude = longitude_map.get(label)
-                        if longitude is None and planet_id == const._KETU:
-                            rahu_longitude = longitude_map.get("Raasi-Rahu")
-                            if rahu_longitude is None:
-                                rahu_longitude = drik.sidereal_longitude(jd_utc, const._RAHU)
-                                longitude_map["Raasi-Rahu"] = rahu_longitude
-                            longitude = (rahu_longitude + 180.0) % 360.0
-                        elif longitude is None:
-                            longitude = drik.sidereal_longitude(jd_utc, planet_id)
-                        longitude_map[label] = longitude
-                        nakshatra_index, pada, _ = drik.nakshatra_pada(longitude)
-                        nakshatra_name = ChartCleaner.clean_text(
-                            utils.NAKSHATRA_LIST[nakshatra_index - 1]
-                        )
-                        nakshatra_lord_index = utils.nakshathra_lord(nakshatra_index)
-                        nakshatra_lord_name = ChartCleaner.clean_text(
-                            utils.PLANET_NAMES[nakshatra_lord_index]
-                        )
-                        cleaned_data["nakshatras"][label] = {
-                            "name": nakshatra_name,
-                            "pada": pada,
-                            "lord": nakshatra_lord_name,
-                        }
-                    except Exception as planet_exception:
-                        logger.warning(
-                            "Could not compute %s nakshatra: %s",
-                            label,
-                            planet_exception,
-                        )
-            except Exception as nakshatra_exception:
-                logger.warning(
-                    "Could not initialize nakshatra computation context: %s",
-                    nakshatra_exception,
+                longitude = longitude_map.get(label)
+                if longitude is None and planet_id == const._KETU:
+                    rahu_longitude = longitude_map.get("Raasi-Rahu")
+                    if rahu_longitude is None:
+                        with suppress_third_party_stdout():
+                            rahu_longitude = drik.sidereal_longitude(jd_utc, const._RAHU)
+                        longitude_map["Raasi-Rahu"] = rahu_longitude
+                    longitude = (rahu_longitude + 180.0) % 360.0
+                elif longitude is None:
+                    with suppress_third_party_stdout():
+                        longitude = drik.sidereal_longitude(jd_utc, planet_id)
+                longitude_map[label] = longitude
+                nakshatra_index, pada, _ = drik.nakshatra_pada(longitude)
+                nakshatra_name = ChartCleaner.clean_text(
+                    utils.NAKSHATRA_LIST[nakshatra_index - 1]
                 )
+                nakshatra_lord_index = utils.nakshathra_lord(nakshatra_index)
+                nakshatra_lord_name = ChartCleaner.clean_text(
+                    utils.PLANET_NAMES[nakshatra_lord_index]
+                )
+                cleaned_data["nakshatras"][label] = {
+                    "name": nakshatra_name,
+                    "pada": pada,
+                    "lord": nakshatra_lord_name,
+                }
+            except Exception as planet_exception:
+                logger.warning(
+                    "Could not compute %s nakshatra: %s",
+                    label,
+                    planet_exception,
+                )
+    except Exception as nakshatra_exception:
+        logger.warning(
+            "Could not initialize nakshatra computation context: %s",
+            nakshatra_exception,
+        )
 
     return {"status": "success", "data": cleaned_data}
 

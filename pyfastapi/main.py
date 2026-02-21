@@ -10,6 +10,7 @@ import logging
 import traceback
 import time
 import atexit
+from cache_service import CacheConfig, HoroscopeCacheService
 
 # --- Astrological Library Imports ---
 from jhora import const
@@ -37,6 +38,7 @@ for noisy_logger_name in ("jhora", "swisseph"):
 
 _DEVNULL_WRITER = open(os.devnull, "w")
 atexit.register(_DEVNULL_WRITER.close)
+CACHE_SERVICE = HoroscopeCacheService(CacheConfig.from_env())
 
 
 @contextlib.contextmanager
@@ -434,10 +436,30 @@ async def get_horoscope(
     compute_started = time.perf_counter()
     try:
         _ = app_check_claims
+        normalized_key_fields = CACHE_SERVICE.normalize_key_fields(
+            dob=data.dob,
+            time_value=data.time,
+            lat=data.lat,
+            lng=data.lng,
+            tz=data.tz,
+            language=data.language,
+        )
+        cache_key = CACHE_SERVICE.build_cache_key(normalized_key_fields)
+        cached_payload = CACHE_SERVICE.get(cache_key)
+        if cached_payload is not None:
+            logger.info(
+                "horoscope_compute status=cached duration_ms=%.2f hit_rate=%.4f",
+                (time.perf_counter() - compute_started) * 1000,
+                CACHE_SERVICE.metrics.snapshot()["hit_rate"],
+            )
+            return cached_payload
+
         payload = await run_in_threadpool(_build_horoscope_payload, data)
+        CACHE_SERVICE.set(cache_key, payload)
         logger.info(
-            "horoscope_compute status=success duration_ms=%.2f",
+            "horoscope_compute status=success duration_ms=%.2f hit_rate=%.4f",
             (time.perf_counter() - compute_started) * 1000,
+            CACHE_SERVICE.metrics.snapshot()["hit_rate"],
         )
         return payload
 
@@ -469,3 +491,17 @@ async def get_horoscope(
 @app.get("/")
 def health_check():
     return {"status": "online"}
+
+
+@app.get("/metrics/cache")
+def cache_metrics() -> Dict[str, object]:
+    metrics = CACHE_SERVICE.metrics.snapshot()
+    metrics.update(
+        {
+            "backend": CACHE_SERVICE.config.backend,
+            "ttl_seconds": CACHE_SERVICE.config.ttl_seconds,
+            "lat_lng_precision": CACHE_SERVICE.config.lat_lng_precision,
+            "tz_precision": CACHE_SERVICE.config.tz_precision,
+        }
+    )
+    return metrics

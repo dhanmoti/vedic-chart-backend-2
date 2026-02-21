@@ -9,3 +9,4 @@ python-dateutil
 pyswisseph
 pyjhora
 firebase_admin
+redis

@@ -289,7 +289,7 @@ def _build_horoscope_payload(data: HoroscopeRequest) -> Dict[str, object]:
     hour, minute = [int(p) for p in data.time.split(":")]
     date_in = drik.Date(year, month, day)
     place = drik.Place("Birth Place", data.lat, data.lng, data.tz)
-    birth_julian_day = utils.julian_day_number(date_in, (hour, minute, 0))
+    jd_local = utils.julian_day_number(date_in, (hour, minute, 0))
 
     _configure_ephemeris_path(ephe_path)
 
@@ -328,12 +328,12 @@ def _build_horoscope_payload(data: HoroscopeRequest) -> Dict[str, object]:
     try:
         with suppress_third_party_stdout():
             utils.set_language(data.language)
-        jd_utc = birth_julian_day - (place.timezone / 24.0)
+        jd_utc = jd_local - (place.timezone / 24.0)
 
         try:
             with suppress_third_party_stdout():
                 asc_sign, _asc_longitude, asc_nakshatra_index, asc_pada = drik.ascendant(
-                    jd_utc,
+                    jd_local,
                     place,
                 )
             asc_lord_index = int(const.house_owners[asc_sign])

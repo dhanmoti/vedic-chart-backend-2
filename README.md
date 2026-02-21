@@ -47,29 +47,21 @@ Generates horoscope placements/charts and includes ascendant lord, ascendant nak
 
 If ascendant or planet nakshatra computation cannot be completed, those specific fields are returned as `null` and the request still succeeds.
 
-## Cache backend rollout guidance
+## Cache behavior guidance
 
-### Cloud Run deployment (Redis/Memorystore)
-
-For Cloud Run revisions that autoscale above a single instance, deploy with Redis as the shared cache backend:
-
-```bash
-gcloud run services update vedic-chart-backend \
-  --region=YOUR_REGION \
-  --set-env-vars=CACHE_BACKEND=redis,REDIS_URL=redis://YOUR_MEMORSTORE_HOST:6379
-```
-
-Use the Memorystore private endpoint for `REDIS_URL`. The service validates Redis connectivity once during startup (`PING`) and fails fast if Redis is unreachable.
+The service uses an in-process, TTL-based in-memory cache for horoscope responses.
 
 ### Local/dev defaults
 
-Keep local and developer environments on in-memory caching by default:
+In-memory caching is enabled by default. Optional environment variables:
 
 ```bash
-CACHE_BACKEND=memory
+CACHE_TTL_SECONDS=900
+CACHE_MAX_ENTRIES=1024
+CACHE_LAT_LNG_PRECISION=2
+CACHE_TZ_PRECISION=2
+CACHE_KEY_PREFIX=horoscope:v1
 ```
-
-This remains the default when `CACHE_BACKEND` is unset.
 
 ### Cloud Run scaling and cost profile
 
@@ -88,10 +80,6 @@ Track `GET /metrics/cache` before and after rollout and compare:
 - `hit_rate`
 - `requests`
 - `errors`
-- `backend` / `requested_backend`
+- `backend`
 
-A sustained higher hit rate with Redis should correspond to lower horoscope recomputation CPU cost.
-
-### Optional L1 + L2 approach
-
-If Redis network latency becomes a bottleneck, add a short-TTL in-process L1 cache in front of Redis L2 so hot keys are served from memory while keeping cross-instance cache consistency in Redis.
+A sustained higher hit rate should correspond to lower horoscope recomputation CPU cost.

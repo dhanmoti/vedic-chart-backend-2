@@ -85,7 +85,14 @@ if not os.path.exists(ephe_path):
     logger.error("Ephemeris path not found: %s", ephe_path)
     raise RuntimeError("Swiss Ephemeris data not found")
 
-swe.set_ephe_path(ephe_path)
+def _configure_ephemeris_path(path: str) -> None:
+    """Keep SwissEph path in sync for both swisseph and pyjhora internals."""
+    normalized_path = os.path.abspath(path)
+    const._EPHIMERIDE_DATA_PATH = normalized_path
+    swe.set_ephe_path(normalized_path)
+
+
+_configure_ephemeris_path(ephe_path)
 
 # -------------------------------------------------------------------
 # Helper Logic
@@ -227,6 +234,8 @@ async def get_horoscope(
         date_in = drik.Date(year, month, day)
         place = drik.Place("Birth Place", data.lat, data.lng, data.tz)
         birth_julian_day = utils.julian_day_number(date_in, (hour, minute, 0))
+
+        _configure_ephemeris_path(ephe_path)
 
         # Silence noisy stdout from jhora
         with open(os.devnull, "w") as fnull:

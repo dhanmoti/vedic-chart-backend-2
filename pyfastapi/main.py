@@ -31,7 +31,14 @@ from firebase_admin import exceptions as firebase_exceptions
 app = FastAPI()
 
 logger = logging.getLogger("uvicorn.error")
-logger.setLevel(logging.INFO)
+
+
+def _resolve_log_level() -> int:
+    configured_level = os.getenv("LOG_LEVEL", "INFO").strip().upper()
+    return logging._nameToLevel.get(configured_level, logging.INFO)
+
+
+logger.setLevel(_resolve_log_level())
 
 for noisy_logger_name in ("jhora", "swisseph"):
     logging.getLogger(noisy_logger_name).setLevel(logging.WARNING)
@@ -71,13 +78,13 @@ async def verify_app_check(
     verify_started = time.perf_counter()
     try:
         claims = app_check.verify_token(token)
-        logger.info(
+        logger.debug(
             "app_check_verify status=success duration_ms=%.2f",
             (time.perf_counter() - verify_started) * 1000,
         )
         return claims
     except firebase_exceptions.FirebaseError as e:
-        logger.info(
+        logger.debug(
             "app_check_verify status=failure kind=firebase_error duration_ms=%.2f",
             (time.perf_counter() - verify_started) * 1000,
         )
@@ -91,7 +98,7 @@ async def verify_app_check(
             detail="Invalid App Check token."
         )
     except Exception as e:
-        logger.info(
+        logger.debug(
             "app_check_verify status=failure kind=unknown duration_ms=%.2f",
             (time.perf_counter() - verify_started) * 1000,
         )
@@ -448,6 +455,9 @@ async def get_horoscope(
         cached_payload = CACHE_SERVICE.get(cache_key)
         if cached_payload is not None:
             logger.info(
+                "horoscope status=success source=cache"
+            )
+            logger.debug(
                 "horoscope_compute status=cached duration_ms=%.2f hit_rate=%.4f",
                 (time.perf_counter() - compute_started) * 1000,
                 CACHE_SERVICE.metrics.snapshot()["hit_rate"],
@@ -457,6 +467,9 @@ async def get_horoscope(
         payload = await run_in_threadpool(_build_horoscope_payload, data)
         CACHE_SERVICE.set(cache_key, payload)
         logger.info(
+            "horoscope status=success source=generated"
+        )
+        logger.debug(
             "horoscope_compute status=success duration_ms=%.2f hit_rate=%.4f",
             (time.perf_counter() - compute_started) * 1000,
             CACHE_SERVICE.metrics.snapshot()["hit_rate"],
@@ -464,7 +477,7 @@ async def get_horoscope(
         return payload
 
     except ValueError as e:
-        logger.info(
+        logger.debug(
             "horoscope_compute status=failure kind=value_error duration_ms=%.2f",
             (time.perf_counter() - compute_started) * 1000,
         )
@@ -474,7 +487,7 @@ async def get_horoscope(
             detail="Invalid input parameters."
         )
     except Exception as e:
-        logger.info(
+        logger.debug(
             "horoscope_compute status=failure kind=internal_error duration_ms=%.2f",
             (time.perf_counter() - compute_started) * 1000,
         )

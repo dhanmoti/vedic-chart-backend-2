@@ -19,6 +19,7 @@ class CacheConfig:
     lat_lng_precision: int
     tz_precision: int
     key_prefix: str
+    redis_url: Optional[str]
 
     @staticmethod
     def from_env() -> "CacheConfig":
@@ -29,6 +30,7 @@ class CacheConfig:
             lat_lng_precision=max(0, int(os.getenv("CACHE_LAT_LNG_PRECISION", "2"))),
             tz_precision=max(0, int(os.getenv("CACHE_TZ_PRECISION", "2"))),
             key_prefix=os.getenv("CACHE_KEY_PREFIX", "horoscope:v1"),
+            redis_url=os.getenv("REDIS_URL"),
         )
 
 
@@ -119,6 +121,9 @@ class RedisCacheBackend(BaseCacheBackend):
 
         self._redis = redis.Redis.from_url(redis_url, decode_responses=True)
 
+    def ping(self) -> bool:
+        return bool(self._redis.ping())
+
     def get(self, key: str) -> Optional[Dict[str, Any]]:
         cached = self._redis.get(key)
         if cached is None:
@@ -133,24 +138,46 @@ class HoroscopeCacheService:
     def __init__(self, config: CacheConfig):
         self.config = config
         self.metrics = CacheMetrics()
+        self.backend_name = "memory"
         self._backend = self._build_backend(config)
+        self._log_startup_backend_status()
 
     @staticmethod
     def _build_backend(config: CacheConfig) -> BaseCacheBackend:
+        if config.backend not in {"memory", "redis"}:
+            logger.warning("cache_backend_select backend=%s status=invalid fallback=memory", config.backend)
+            return InMemoryTTLCache(config.max_entries)
+
         if config.backend == "redis":
-            redis_url = os.getenv("REDIS_URL")
+            redis_url = config.redis_url
             if not redis_url:
                 raise RuntimeError("CACHE_BACKEND=redis requires REDIS_URL")
+            return RedisCacheBackend(redis_url)
+
+        return InMemoryTTLCache(config.max_entries)
+
+    def _log_startup_backend_status(self) -> None:
+        requested_backend = self.config.backend
+        if isinstance(self._backend, RedisCacheBackend):
+            self.backend_name = "redis"
             try:
-                logger.info("cache_backend_select backend=redis")
-                return RedisCacheBackend(redis_url)
+                self._backend.ping()
+                logger.info("cache_backend_startup requested=%s selected=redis redis_ping=ok", requested_backend)
             except Exception as redis_error:
-                logger.warning(
-                    "cache_backend_select backend=redis status=fallback error=%s",
+                logger.error(
+                    "cache_backend_startup requested=%s selected=redis redis_ping=error error=%s",
+                    requested_backend,
                     redis_error,
                 )
-        logger.info("cache_backend_select backend=memory")
-        return InMemoryTTLCache(config.max_entries)
+                raise RuntimeError("Redis cache backend connectivity check failed") from redis_error
+            return
+
+        self.backend_name = "memory"
+        logger.info(
+            "cache_backend_startup requested=%s selected=memory reason=%s",
+            requested_backend,
+            "local_or_dev" if requested_backend == "memory" else "fallback_or_invalid",
+        )
 
     def normalize_key_fields(
         self,
@@ -187,10 +214,10 @@ class HoroscopeCacheService:
             cached = self._backend.get(cache_key)
             if cached is None:
                 self.metrics.miss()
-                logger.debug("cache_lookup status=miss backend=%s key=%s", self.config.backend, safe_key)
+                logger.debug("cache_lookup status=miss backend=%s key=%s", self.backend_name, safe_key)
                 return None
             self.metrics.hit()
-            logger.debug("cache_lookup status=hit backend=%s key=%s", self.config.backend, safe_key)
+            logger.debug("cache_lookup status=hit backend=%s key=%s", self.backend_name, safe_key)
             return cached
         except Exception as cache_error:
             self.metrics.error()
@@ -204,7 +231,7 @@ class HoroscopeCacheService:
             self.metrics.write()
             logger.debug(
                 "cache_store status=ok backend=%s ttl=%s key=%s",
-                self.config.backend,
+                self.backend_name,
                 self.config.ttl_seconds,
                 safe_key,
             )

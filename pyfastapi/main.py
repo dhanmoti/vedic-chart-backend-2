@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException, Header, Depends
+from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, validator
 from datetime import date
 from typing import Dict, List, Optional
@@ -7,6 +8,9 @@ import contextlib
 import re
 import logging
 import traceback
+import time
+import atexit
+from cache_service import CacheConfig, HoroscopeCacheService
 
 # --- Astrological Library Imports ---
 from jhora import const
@@ -27,7 +31,27 @@ from firebase_admin import exceptions as firebase_exceptions
 app = FastAPI()
 
 logger = logging.getLogger("uvicorn.error")
-logger.setLevel(logging.INFO)
+
+
+def _resolve_log_level() -> int:
+    configured_level = os.getenv("LOG_LEVEL", "INFO").strip().upper()
+    return logging._nameToLevel.get(configured_level, logging.INFO)
+
+
+logger.setLevel(_resolve_log_level())
+
+for noisy_logger_name in ("jhora", "swisseph"):
+    logging.getLogger(noisy_logger_name).setLevel(logging.WARNING)
+
+_DEVNULL_WRITER = open(os.devnull, "w")
+atexit.register(_DEVNULL_WRITER.close)
+CACHE_SERVICE = HoroscopeCacheService(CacheConfig.from_env())
+
+
+@contextlib.contextmanager
+def suppress_third_party_stdout():
+    with contextlib.redirect_stdout(_DEVNULL_WRITER):
+        yield
 
 # -------------------------------------------------------------------
 # Firebase Initialization (Cloud Run friendly)
@@ -51,10 +75,19 @@ async def verify_app_check(
             detail="X-Firebase-AppCheck header is missing."
         )
 
+    verify_started = time.perf_counter()
     try:
         claims = app_check.verify_token(token)
+        logger.debug(
+            "app_check_verify status=success duration_ms=%.2f",
+            (time.perf_counter() - verify_started) * 1000,
+        )
         return claims
     except firebase_exceptions.FirebaseError as e:
+        logger.debug(
+            "app_check_verify status=failure kind=firebase_error duration_ms=%.2f",
+            (time.perf_counter() - verify_started) * 1000,
+        )
         logger.warning(
             "App Check FirebaseError: %s | %s",
             e.code,
@@ -65,6 +98,10 @@ async def verify_app_check(
             detail="Invalid App Check token."
         )
     except Exception as e:
+        logger.debug(
+            "app_check_verify status=failure kind=unknown duration_ms=%.2f",
+            (time.perf_counter() - verify_started) * 1000,
+        )
         logger.error(
             "App Check Unknown Error: %s\n%s",
             repr(e),
@@ -134,6 +171,74 @@ class ChartCleaner:
             "house_indices": raw_horoscope[2],
         }
 
+
+_SIGN_TO_INDEX = {
+    "Aries": 0,
+    "Taurus": 1,
+    "Gemini": 2,
+    "Cancer": 3,
+    "Leo": 4,
+    "Virgo": 5,
+    "Libra": 6,
+    "Scorpio": 7,
+    "Sagittarius": 8,
+    "Capricorn": 9,
+    "Aquarius": 10,
+    "Pisces": 11,
+}
+
+
+def _parse_longitude_from_placement(placement_value: str) -> Optional[float]:
+    match = re.search(
+        r"\b(Aries|Taurus|Gemini|Cancer|Leo|Virgo|Libra|Scorpio|Sagittarius|Capricorn|Aquarius|Pisces)\s+(\d{1,2})\s+(\d{1,2})(?:\s+(\d{1,2}))?",
+        placement_value,
+    )
+    if not match:
+        return None
+
+    sign_name = match.group(1)
+    sign_index = _SIGN_TO_INDEX[sign_name]
+    degrees = int(match.group(2))
+    minutes = int(match.group(3))
+    seconds = int(match.group(4) or 0)
+    sign_offset = degrees + (minutes / 60.0) + (seconds / 3600.0)
+    return sign_index * 30.0 + sign_offset
+
+
+def _extract_longitude_map(placements: Dict[str, str]) -> Dict[str, float]:
+    aliases = {
+        "Raasi-Lagna": ["Raasi-Ascendant", "Raasi-Lagna"],
+        "Raasi-Sun": ["Raasi-Sun"],
+        "Raasi-Moon": ["Raasi-Moon"],
+        "Raasi-Mars": ["Raasi-Mars"],
+        "Raasi-Mercury": ["Raasi-Mercury"],
+        "Raasi-Jupiter": ["Raasi-Jupiter"],
+        "Raasi-Venus": ["Raasi-Venus"],
+        "Raasi-Saturn": ["Raasi-Saturn"],
+        "Raasi-Rahu": ["Raasi-Rahu", "Raasi-Raagu"],
+        "Raasi-Ketu": ["Raasi-Ketu", "Raasi-Kethu"],
+    }
+
+    longitude_map: Dict[str, float] = {}
+    for normalized_label, candidates in aliases.items():
+        for candidate in candidates:
+            placement_value = placements.get(candidate)
+            if not placement_value:
+                continue
+            longitude = _parse_longitude_from_placement(placement_value)
+            if longitude is not None:
+                longitude_map[normalized_label] = longitude
+                break
+
+    rahu_longitude = longitude_map.get("Raasi-Rahu")
+    ketu_longitude = longitude_map.get("Raasi-Ketu")
+    if rahu_longitude is not None and ketu_longitude is None:
+        longitude_map["Raasi-Ketu"] = (rahu_longitude + 180.0) % 360.0
+    elif ketu_longitude is not None and rahu_longitude is None:
+        longitude_map["Raasi-Rahu"] = (ketu_longitude + 180.0) % 360.0
+
+    return longitude_map
+
 # -------------------------------------------------------------------
 # Request Models
 # -------------------------------------------------------------------
@@ -177,6 +282,123 @@ class HoroscopeData(BaseModel):
 class HoroscopeResponse(BaseModel):
     status: str
     data: HoroscopeData
+
+
+def _build_horoscope_payload(data: HoroscopeRequest) -> Dict[str, object]:
+    year, month, day = [int(p) for p in data.dob.split("-")]
+    hour, minute = [int(p) for p in data.time.split(":")]
+    date_in = drik.Date(year, month, day)
+    place = drik.Place("Birth Place", data.lat, data.lng, data.tz)
+    jd_local = utils.julian_day_number(date_in, (hour, minute, 0))
+
+    _configure_ephemeris_path(ephe_path)
+
+    with suppress_third_party_stdout():
+        horoscope = Horoscope(
+            latitude=data.lat,
+            longitude=data.lng,
+            timezone_offset=data.tz,
+            date_in=date_in,
+            birth_time=data.time,
+            language=data.language,
+        )
+    with suppress_third_party_stdout():
+        raw_info = horoscope.get_horoscope_information()
+
+    cleaned_data = ChartCleaner.format_response(raw_info)
+    cleaned_data["ascendant_lord"] = None
+    cleaned_data["ascendant_nakshatra"] = None
+    graha_labels = {
+        const._SUN: "Sun",
+        const._MOON: "Moon",
+        const._MARS: "Mars",
+        const._MERCURY: "Mercury",
+        const._JUPITER: "Jupiter",
+        const._VENUS: "Venus",
+        const._SATURN: "Saturn",
+        const._RAHU: "Rahu",
+        const._KETU: "Ketu",
+    }
+    cleaned_data["nakshatras"] = {
+        f"Raasi-{label}": None
+        for label in graha_labels.values()
+    }
+    cleaned_data["nakshatras"]["Raasi-Lagna"] = None
+
+    try:
+        with suppress_third_party_stdout():
+            utils.set_language(data.language)
+        jd_utc = jd_local - (place.timezone / 24.0)
+
+        try:
+            with suppress_third_party_stdout():
+                asc_sign, _asc_longitude, asc_nakshatra_index, asc_pada = drik.ascendant(
+                    jd_local,
+                    place,
+                )
+            asc_lord_index = int(const.house_owners[asc_sign])
+            cleaned_data["ascendant_lord"] = ChartCleaner.clean_text(
+                utils.PLANET_NAMES[asc_lord_index]
+            )
+            asc_nakshatra_name = ChartCleaner.clean_text(
+                utils.NAKSHATRA_LIST[asc_nakshatra_index - 1]
+            )
+            asc_nakshatra_lord_index = utils.nakshathra_lord(asc_nakshatra_index)
+            asc_nakshatra_lord_name = ChartCleaner.clean_text(
+                utils.PLANET_NAMES[asc_nakshatra_lord_index]
+            )
+            cleaned_data["ascendant_nakshatra"] = {
+                "name": asc_nakshatra_name,
+                "pada": asc_pada,
+                "lord": asc_nakshatra_lord_name,
+            }
+            cleaned_data["nakshatras"]["Raasi-Lagna"] = {
+                "name": asc_nakshatra_name,
+                "pada": asc_pada,
+                "lord": asc_nakshatra_lord_name,
+            }
+        except Exception as ascendant_exception:
+            logger.warning(
+                "Could not compute ascendant details: %s",
+                ascendant_exception,
+            )
+
+        for planet_id in drik.planet_list:
+            label = f"Raasi-{graha_labels.get(planet_id, str(planet_id))}"
+            try:
+                if planet_id == const._KETU:
+                    with suppress_third_party_stdout():
+                        rahu_longitude = drik.sidereal_longitude(jd_utc, const._RAHU)
+                    longitude = (rahu_longitude + 180.0) % 360.0
+                else:
+                    with suppress_third_party_stdout():
+                        longitude = drik.sidereal_longitude(jd_utc, planet_id)
+                nakshatra_index, pada, _ = drik.nakshatra_pada(longitude)
+                nakshatra_name = ChartCleaner.clean_text(
+                    utils.NAKSHATRA_LIST[nakshatra_index - 1]
+                )
+                nakshatra_lord_index = utils.nakshathra_lord(nakshatra_index)
+                nakshatra_lord_name = ChartCleaner.clean_text(
+                    utils.PLANET_NAMES[nakshatra_lord_index]
+                )
+                cleaned_data["nakshatras"][label] = {
+                    "name": nakshatra_name,
+                    "pada": pada,
+                    "lord": nakshatra_lord_name,
+                }
+            except Exception as planet_exception:
+                logger.warning(
+                    "Could not compute %s nakshatra: %s",
+                    label,
+                    planet_exception,
+                )
+    except Exception as nakshatra_exception:
+        logger.warning(
+            "Could not initialize nakshatra computation context: %s",
+            nakshatra_exception,
+        )
+
+    return {"status": "success", "data": cleaned_data}
 
 # -------------------------------------------------------------------
 # Endpoints
@@ -228,128 +450,57 @@ async def get_horoscope(
     data: HoroscopeRequest,
     app_check_claims=Depends(verify_app_check),
 ) -> HoroscopeResponse:
+    compute_started = time.perf_counter()
     try:
-        year, month, day = [int(p) for p in data.dob.split("-")]
-        hour, minute = [int(p) for p in data.time.split(":")]
-        date_in = drik.Date(year, month, day)
-        place = drik.Place("Birth Place", data.lat, data.lng, data.tz)
-        birth_julian_day = utils.julian_day_number(date_in, (hour, minute, 0))
+        _ = app_check_claims
+        normalized_key_fields = CACHE_SERVICE.normalize_key_fields(
+            dob=data.dob,
+            time_value=data.time,
+            lat=data.lat,
+            lng=data.lng,
+            tz=data.tz,
+            language=data.language,
+        )
+        cache_key = CACHE_SERVICE.build_cache_key(normalized_key_fields)
+        cached_payload = CACHE_SERVICE.get(cache_key)
+        if cached_payload is not None:
+            logger.info(
+                "horoscope status=success source=cache"
+            )
+            logger.debug(
+                "horoscope_compute status=cached duration_ms=%.2f hit_rate=%.4f",
+                (time.perf_counter() - compute_started) * 1000,
+                CACHE_SERVICE.metrics.snapshot()["hit_rate"],
+            )
+            return cached_payload
 
-        _configure_ephemeris_path(ephe_path)
-
-        # Silence noisy stdout from jhora
-        with open(os.devnull, "w") as fnull:
-            with contextlib.redirect_stdout(fnull):
-                horoscope = Horoscope(
-                    latitude=data.lat,
-                    longitude=data.lng,
-                    timezone_offset=data.tz,
-                    date_in=date_in,
-                    birth_time=data.time,
-                    language=data.language,
-                )
-                raw_info = horoscope.get_horoscope_information()
-
-        cleaned_data = ChartCleaner.format_response(raw_info)
-        cleaned_data["ascendant_lord"] = None
-        cleaned_data["ascendant_nakshatra"] = None
-        graha_labels = {
-            const._SUN: "Sun",
-            const._MOON: "Moon",
-            const._MARS: "Mars",
-            const._MERCURY: "Mercury",
-            const._JUPITER: "Jupiter",
-            const._VENUS: "Venus",
-            const._SATURN: "Saturn",
-            const._RAHU: "Rahu",
-            const._KETU: "Ketu",
-        }
-        cleaned_data["nakshatras"] = {
-            f"Raasi-{label}": None
-            for label in graha_labels.values()
-        }
-        cleaned_data["nakshatras"]["Raasi-Lagna"] = None
-
-        with open(os.devnull, "w") as fnull:
-            with contextlib.redirect_stdout(fnull):
-                try:
-                    utils.set_language(data.language)
-                    jd_utc = birth_julian_day - (place.timezone / 24.0)
-
-                    try:
-                        asc_sign, _asc_longitude, asc_nakshatra_index, asc_pada = drik.ascendant(
-                            jd_utc,
-                            place,
-                        )
-                        asc_lord_index = int(const.house_owners[asc_sign])
-                        cleaned_data["ascendant_lord"] = ChartCleaner.clean_text(
-                            utils.PLANET_NAMES[asc_lord_index]
-                        )
-                        asc_nakshatra_name = ChartCleaner.clean_text(
-                            utils.NAKSHATRA_LIST[asc_nakshatra_index - 1]
-                        )
-                        asc_nakshatra_lord_index = utils.nakshathra_lord(asc_nakshatra_index)
-                        asc_nakshatra_lord_name = ChartCleaner.clean_text(
-                            utils.PLANET_NAMES[asc_nakshatra_lord_index]
-                        )
-                        cleaned_data["ascendant_nakshatra"] = {
-                            "name": asc_nakshatra_name,
-                            "pada": asc_pada,
-                            "lord": asc_nakshatra_lord_name,
-                        }
-                        cleaned_data["nakshatras"]["Raasi-Lagna"] = {
-                            "name": asc_nakshatra_name,
-                            "pada": asc_pada,
-                            "lord": asc_nakshatra_lord_name,
-                        }
-                    except Exception as ascendant_exception:
-                        logger.warning(
-                            "Could not compute ascendant details: %s",
-                            ascendant_exception,
-                        )
-
-                    for planet_id in drik.planet_list:
-                        label = f"Raasi-{graha_labels.get(planet_id, str(planet_id))}"
-                        try:
-                            if planet_id == const._KETU:
-                                rahu_longitude = drik.sidereal_longitude(jd_utc, const._RAHU)
-                                longitude = (rahu_longitude + 180.0) % 360.0
-                            else:
-                                longitude = drik.sidereal_longitude(jd_utc, planet_id)
-                            nakshatra_index, pada, _ = drik.nakshatra_pada(longitude)
-                            nakshatra_name = ChartCleaner.clean_text(
-                                utils.NAKSHATRA_LIST[nakshatra_index - 1]
-                            )
-                            nakshatra_lord_index = utils.nakshathra_lord(nakshatra_index)
-                            nakshatra_lord_name = ChartCleaner.clean_text(
-                                utils.PLANET_NAMES[nakshatra_lord_index]
-                            )
-                            cleaned_data["nakshatras"][label] = {
-                                "name": nakshatra_name,
-                                "pada": pada,
-                                "lord": nakshatra_lord_name,
-                            }
-                        except Exception as planet_exception:
-                            logger.warning(
-                                "Could not compute %s nakshatra: %s",
-                                label,
-                                planet_exception,
-                            )
-                except Exception as nakshatra_exception:
-                    logger.warning(
-                        "Could not initialize nakshatra computation context: %s",
-                        nakshatra_exception,
-                    )
-
-        return {"status": "success", "data": cleaned_data}
+        payload = await run_in_threadpool(_build_horoscope_payload, data)
+        CACHE_SERVICE.set(cache_key, payload)
+        logger.info(
+            "horoscope status=success source=generated"
+        )
+        logger.debug(
+            "horoscope_compute status=success duration_ms=%.2f hit_rate=%.4f",
+            (time.perf_counter() - compute_started) * 1000,
+            CACHE_SERVICE.metrics.snapshot()["hit_rate"],
+        )
+        return payload
 
     except ValueError as e:
+        logger.debug(
+            "horoscope_compute status=failure kind=value_error duration_ms=%.2f",
+            (time.perf_counter() - compute_started) * 1000,
+        )
         logger.warning("Invalid input: %s", e)
         raise HTTPException(
             status_code=400,
             detail="Invalid input parameters."
         )
     except Exception as e:
+        logger.debug(
+            "horoscope_compute status=failure kind=internal_error duration_ms=%.2f",
+            (time.perf_counter() - compute_started) * 1000,
+        )
         logger.error(
             "Chart generation failed: %s\n%s",
             e,
@@ -363,3 +514,17 @@ async def get_horoscope(
 @app.get("/")
 def health_check():
     return {"status": "online"}
+
+
+@app.get("/metrics/cache")
+def cache_metrics() -> Dict[str, object]:
+    metrics = CACHE_SERVICE.metrics.snapshot()
+    metrics.update(
+        {
+            "backend": CACHE_SERVICE.backend_name,
+            "ttl_seconds": CACHE_SERVICE.config.ttl_seconds,
+            "lat_lng_precision": CACHE_SERVICE.config.lat_lng_precision,
+            "tz_precision": CACHE_SERVICE.config.tz_precision,
+        }
+    )
+    return metrics

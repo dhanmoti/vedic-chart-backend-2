@@ -1,0 +1,25 @@
+# Virtual environments
+venv_stable/
+.venv/
+venv/
+
+# Python cache/test artifacts
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# VCS
+.git/
+.gitignore
+
+# Local editor/temp files
+*.swp
+*.swo
+*~
+.DS_Store
+.vscode/
+.idea/
+
+# Local environment files
+.env
+.env.*

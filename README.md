@@ -46,3 +46,40 @@ Generates horoscope placements/charts and includes ascendant lord, ascendant nak
 ```
 
 If ascendant or planet nakshatra computation cannot be completed, those specific fields are returned as `null` and the request still succeeds.
+
+## Cache behavior guidance
+
+The service uses an in-process, TTL-based in-memory cache for horoscope responses.
+
+### Local/dev defaults
+
+In-memory caching is enabled by default. Optional environment variables:
+
+```bash
+CACHE_TTL_SECONDS=900
+CACHE_MAX_ENTRIES=1024
+CACHE_LAT_LNG_PRECISION=2
+CACHE_TZ_PRECISION=2
+CACHE_KEY_PREFIX=horoscope:v1
+```
+
+### Cloud Run scaling and cost profile
+
+Use the locked deployment profile and benchmark workflow in [`docs/cloud-run-tuning.md`](docs/cloud-run-tuning.md). Deploy with explicit Cloud Run flags via:
+
+```bash
+./deploy/cloud_run_deploy.sh
+```
+
+This keeps `--concurrency`, `--cpu`, `--memory`, `--min-instances`, and `--max-instances` explicit and versioned.
+
+### Metrics and rollout validation
+
+Track `GET /metrics/cache` before and after rollout and compare:
+
+- `hit_rate`
+- `requests`
+- `errors`
+- `backend`
+
+A sustained higher hit rate should correspond to lower horoscope recomputation CPU cost.

@@ -135,13 +135,31 @@ _configure_ephemeris_path(ephe_path)
 # Helper Logic
 # -------------------------------------------------------------------
 class ChartCleaner:
+    _UNICODE_SYMBOL_MAP = {
+        "℞": "(Rx)",
+    }
+    _ALLOWED_NON_ASCII_SYMBOLS = set()
+
     @staticmethod
     def clean_text(text: str) -> str:
-        return (
-            re.sub(r"[^\x00-\x7F]+", "", text)
-            .replace("\n", " ")
-            .strip()
+        cleaned_text = text.replace("\r\n", "\n").replace("\r", "\n")
+
+        for unicode_symbol, replacement in ChartCleaner._UNICODE_SYMBOL_MAP.items():
+            cleaned_text = cleaned_text.replace(unicode_symbol, replacement)
+
+        cleaned_text = "".join(
+            char
+            for char in cleaned_text
+            if char in {"\n", "\t"} or char.isprintable()
         )
+
+        cleaned_text = "".join(
+            char
+            for char in cleaned_text
+            if char.isascii() or char in ChartCleaner._ALLOWED_NON_ASCII_SYMBOLS
+        )
+
+        return re.sub(r"[ \t]+", " ", cleaned_text.replace("\n", " ")).strip()
 
     @staticmethod
     def format_response(raw_horoscope):

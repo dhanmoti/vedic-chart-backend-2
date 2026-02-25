@@ -17,6 +17,7 @@ from helpers import ChartCleaner
 from jhora import const
 from jhora import utils
 from jhora.horoscope.main import Horoscope
+from jhora.horoscope.chart import charts
 from jhora.panchanga import drik
 import swisseph as swe
 
@@ -203,6 +204,32 @@ def _extract_longitude_map(placements: Dict[str, str]) -> Dict[str, float]:
 
     return longitude_map
 
+
+def _traditional_parasara_hora_from_rasi_positions(
+    rasi_positions: List[List[object]],
+) -> List[List[str]]:
+    """Convert rasi positions to a D2 chart using Traditional Parasara mapping."""
+    d2_houses = [[] for _ in range(12)]
+
+    for planet, (sign_index, longitude_in_sign) in rasi_positions:
+        hora_sign = 3  # Moon's Hora => Cancer
+        half_index = int(longitude_in_sign // 15.0)
+        if (sign_index in const.odd_signs and half_index == 0) or (
+            sign_index in const.even_signs and half_index == 1
+        ):
+            hora_sign = 4  # Sun's Hora => Leo
+
+        if planet == "L":
+            planet_name = "Ascendant"
+        else:
+            if not hasattr(utils, "PLANET_NAMES"):
+                utils.set_language("en")
+            planet_name = ChartCleaner.clean_text(utils.PLANET_NAMES[int(planet)])
+
+        d2_houses[hora_sign].append(planet_name)
+
+    return d2_houses
+
 # -------------------------------------------------------------------
 # Request Models
 # -------------------------------------------------------------------
@@ -270,6 +297,19 @@ def _build_horoscope_payload(data: HoroscopeRequest) -> Dict[str, object]:
         raw_info = horoscope.get_horoscope_information()
 
     cleaned_data = ChartCleaner.format_response(raw_info)
+
+    # Enforce Traditional Parasara D2 (Hora) regardless of pyjhora defaults.
+    with suppress_third_party_stdout():
+        rasi_positions = charts.rasi_chart(
+            jd_local,
+            place,
+            calculation_type=horoscope.calculation_type,
+            pravesha_type=horoscope.pravesha_type,
+        )
+    cleaned_data["charts"]["D2"] = _traditional_parasara_hora_from_rasi_positions(
+        rasi_positions
+    )
+
     cleaned_data["ascendant_lord"] = None
     cleaned_data["ascendant_nakshatra"] = None
     graha_labels = {

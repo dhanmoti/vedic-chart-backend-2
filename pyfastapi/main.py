@@ -132,6 +132,10 @@ def _configure_ephemeris_path(path: str) -> None:
 
 _configure_ephemeris_path(ephe_path)
 
+# Use Traditional Parasara as the default Hora (D2) computation method.
+# PyJHora's varga option tuple format is: (number_of_options, default_option).
+const.varga_option_dict[2] = (6, 2)
+
 _SIGN_TO_INDEX = {
     "Aries": 0,
     "Taurus": 1,

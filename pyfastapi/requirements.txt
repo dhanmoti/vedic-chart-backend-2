@@ -7,5 +7,5 @@ timezonefinder
 geopy
 python-dateutil
 pyswisseph
-pyjhora
+pyjhora==4.6.0
 firebase_admin

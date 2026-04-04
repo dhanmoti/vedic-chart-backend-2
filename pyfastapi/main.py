@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException, Header, Depends
 from fastapi.concurrency import run_in_threadpool
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, field_validator
 from datetime import date
 from typing import Dict, List, Optional
 import os
@@ -241,17 +241,38 @@ class HoroscopeRequest(BaseModel):
     tz: float
     language: str = "en"
 
-    @validator("dob")
+    @field_validator("dob")
     def validate_dob(cls, value):
         if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", value):
             raise ValueError("dob must match YYYY-MM-DD format")
         date.fromisoformat(value)
         return value
 
-    @validator("time")
+    @field_validator("time")
     def validate_time(cls, value):
         if not re.fullmatch(r"\d{2}:\d{2}", value):
             raise ValueError("time must match HH:MM format")
+        hour, minute = [int(p) for p in value.split(":")]
+        if not (0 <= hour < 24 and 0 <= minute < 60):
+            raise ValueError("time must be between 00:00 and 23:59")
+        return value
+
+    @field_validator("lat")
+    def validate_lat(cls, value):
+        if not (-90.0 <= value <= 90.0):
+            raise ValueError("lat must be between -90 and 90")
+        return value
+
+    @field_validator("lng")
+    def validate_lng(cls, value):
+        if not (-180.0 <= value <= 180.0):
+            raise ValueError("lng must be between -180 and 180")
+        return value
+
+    @field_validator("tz")
+    def validate_tz(cls, value):
+        if not (-14.0 <= value <= 14.0):
+            raise ValueError("tz must be between -14 and 14")
         return value
 
 

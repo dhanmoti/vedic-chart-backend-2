@@ -51,6 +51,48 @@ class SharedChartCleanerTests(unittest.TestCase):
         self.assertEqual(result["charts"][2]["houses"], [["Ketu"]])
         warning_mock.assert_called_once()
 
+    def test_clean_text_removes_unicode_strips_newlines(self):
+        text = "  Sun\n☉Moon   "
+        self.assertEqual(helpers.ChartCleaner.clean_text(text), "Sun Moon")
+
+    def test_derive_chart_labels_from_placements_returns_unique_labels(self):
+        placements = {
+            "Raasi-Ascendant": "Aries",
+            "D9-Lagna": "Cancer",
+            "D9-Ascendant": "Leo",
+            "D2-Lagna": "Taurus",
+            "something_else": "Gemini",
+        }
+
+        labels = helpers.ChartCleaner._derive_chart_labels_from_placements(placements)
+        self.assertEqual(labels, ["Raasi", "D9", "D2"])
+
+    def test_extract_factor_parses_supported_labels(self):
+        self.assertEqual(helpers.ChartCleaner._extract_factor("Raasi"), 1)
+        self.assertEqual(helpers.ChartCleaner._extract_factor("D9"), 9)
+        self.assertIsNone(helpers.ChartCleaner._extract_factor("chart_1"))
+
+    def test_format_fallback_charts_uses_derived_labels_and_default_chart_names(self):
+        placements = {"D2-Ascendant": "Aries", "D9-Lagna": "Cancer"}
+        chart_entries = [["Sun"], ["Moon"], ["Mars"]]
+
+        with patch.object(helpers.const, "division_chart_factors", [1, 2, 9, 10]), patch.object(
+            helpers.logger,
+            "warning",
+        ) as warning_mock:
+            result = helpers.ChartCleaner._format_fallback_charts(
+                placements=placements,
+                chart_entries=chart_entries,
+                expected_chart_count=4,
+            )
+
+        self.assertEqual(result[0]["label"], "D2")
+        self.assertEqual(result[1]["label"], "D9")
+        self.assertEqual(result[2]["label"], "chart_3")
+        self.assertIsNone(result[2]["factor"])
+        self.assertEqual(result[0]["houses"], [["Sun"]])
+        warning_mock.assert_called_once()
+
 
 if __name__ == "__main__":
     unittest.main()

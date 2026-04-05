@@ -66,3 +66,36 @@ class HoroscopeData(BaseModel):
 class HoroscopeResponse(BaseModel):
     status: str
     data: HoroscopeData
+
+
+class PratyantardashaEntry(BaseModel):
+    lord: str
+    start_date: str
+
+
+class AntardashaEntry(BaseModel):
+    lord: str
+    start_date: str
+    pratyantardashas: List[PratyantardashaEntry]
+
+
+class MahadashaEntry(BaseModel):
+    lord: str
+    start_date: str
+    antardashas: List[AntardashaEntry]
+
+
+class DashaBalance(BaseModel):
+    years: int
+    months: int
+    days: int
+
+
+class DashaData(BaseModel):
+    balance: DashaBalance
+    dashas: List[MahadashaEntry]
+
+
+class DashaResponse(BaseModel):
+    status: str
+    data: DashaData

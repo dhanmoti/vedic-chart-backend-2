@@ -1,6 +1,6 @@
 import logging
 import re
-from typing import Dict
+from typing import Dict, List
 
 from jhora import utils
 from jhora.horoscope.dhasa.graha import vimsottari
@@ -22,7 +22,39 @@ def _planet_name(planet_int: int) -> str:
     return re.sub(r"[^\x00-\x7F]+", "", raw).strip()
 
 
+def _build_pratyantardashas(
+    maha_lord: int, bhukti_lord: int, bhukti_start_jd: float
+) -> List[Dict]:
+    antara_dict = vimsottari._vimsottari_antara(maha_lord, bhukti_lord, bhukti_start_jd)
+    return [
+        {
+            "lord": _planet_name(antara_lord),
+            "start_date": _jd_to_date_str(antara_start_jd),
+        }
+        for antara_lord, antara_start_jd in antara_dict.items()
+    ]
+
+
+def _build_antardashas(maha_lord: int, maha_start_jd: float) -> List[Dict]:
+    bhukti_dict = vimsottari._vimsottari_bhukti(maha_lord, maha_start_jd)
+    return [
+        {
+            "lord": _planet_name(bhukti_lord),
+            "start_date": _jd_to_date_str(bhukti_start_jd),
+            "pratyantardashas": _build_pratyantardashas(
+                maha_lord, bhukti_lord, bhukti_start_jd
+            ),
+        }
+        for bhukti_lord, bhukti_start_jd in bhukti_dict.items()
+    ]
+
+
 def build_dasha_payload(data: HoroscopeRequest) -> Dict:
+    """Compute Vimshottari Mahadasha data for the given birth details.
+
+    Returns the dasha balance at birth and all 9 mahadashas, each with
+    9 antardashas and 9 pratyantardashas.
+    """
     year, month, day = [int(p) for p in data.dob.split("-")]
     hour, minute = [int(p) for p in data.time.split(":")]
     date_in = drik.Date(year, month, day)
@@ -39,39 +71,23 @@ def build_dasha_payload(data: HoroscopeRequest) -> Dict:
         )
         mahadashas = vimsottari.vimsottari_mahadasa(jd, place)
 
-        dashas = []
-        for maha_lord, maha_start_jd in mahadashas.items():
-            bhukti_dict = vimsottari._vimsottari_bhukti(maha_lord, maha_start_jd)
-            antardashas = []
-            for bhukti_lord, bhukti_start_jd in bhukti_dict.items():
-                antara_dict = vimsottari._vimsottari_antara(
-                    maha_lord, bhukti_lord, bhukti_start_jd
-                )
-                pratyantardashas = [
-                    {
-                        "lord": _planet_name(al),
-                        "start_date": _jd_to_date_str(asjd),
-                    }
-                    for al, asjd in antara_dict.items()
-                ]
-                antardashas.append({
-                    "lord": _planet_name(bhukti_lord),
-                    "start_date": _jd_to_date_str(bhukti_start_jd),
-                    "pratyantardashas": pratyantardashas,
-                })
-            dashas.append({
+        balance_years, balance_months, balance_days = vim_bal
+        dashas = [
+            {
                 "lord": _planet_name(maha_lord),
                 "start_date": _jd_to_date_str(maha_start_jd),
-                "antardashas": antardashas,
-            })
+                "antardashas": _build_antardashas(maha_lord, maha_start_jd),
+            }
+            for maha_lord, maha_start_jd in mahadashas.items()
+        ]
 
     return {
         "status": "success",
         "data": {
             "balance": {
-                "years": vim_bal[0],
-                "months": vim_bal[1],
-                "days": vim_bal[2],
+                "years": balance_years,
+                "months": balance_months,
+                "days": balance_days,
             },
             "dashas": dashas,
         },

@@ -2,7 +2,6 @@ import re
 from datetime import date
 from unittest.mock import patch
 
-import pytest
 from fastapi.testclient import TestClient
 
 import routers.dasha as dasha_router

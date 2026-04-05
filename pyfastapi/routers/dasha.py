@@ -24,12 +24,17 @@ CACHE_SERVICE = HoroscopeCacheService(
 router = APIRouter()
 
 
-@router.post("/dasha", response_model=DashaResponse)
-async def get_dasha(
-    data: HoroscopeRequest,
-    app_check_claims=Depends(verify_app_check),
-) -> DashaResponse:
-    _ = app_check_claims
+@router.post(
+    "/dasha",
+    response_model=DashaResponse,
+    summary="Vimshottari Mahadasha",
+    description=(
+        "Returns the Vimshottari dasha balance at birth and all 9 mahadashas, "
+        "each with 9 antardashas and 9 pratyantardashas."
+    ),
+    dependencies=[Depends(verify_app_check)],
+)
+async def get_dasha(data: HoroscopeRequest) -> DashaResponse:
     compute_started = time.perf_counter()
     try:
         normalized_key_fields = CACHE_SERVICE.normalize_key_fields(

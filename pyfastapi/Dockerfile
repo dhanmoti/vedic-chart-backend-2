@@ -1,4 +1,4 @@
-FROM python:3.10-slim AS builder
+FROM python:3.13-slim AS builder
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
@@ -15,7 +15,7 @@ COPY services ./services
 COPY jhora ./jhora
 
 
-FROM python:3.10-slim AS runtime
+FROM python:3.13-slim AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1

@@ -25,6 +25,19 @@ _NORTH_EN_NAKSHATRA_NAMES = [
 
 _NORTH_EN_PLANET_NAME_FIXES = {"Raagu": "Rahu", "Kethu": "Ketu"}
 
+# Indexed by planet_list order: Sun=0 … Ketu=8
+_PLANET_COLORS = [
+    "sun_fiery_orange",       # 0 Surya
+    "moon_pearl_white",       # 1 Chandra
+    "mars_blood_red",         # 2 Mangal
+    "mercury_emerald_green",  # 3 Budha
+    "jupiter_honey_gold",     # 4 Guru
+    "venus_pastel_pink",      # 5 Shukra
+    "saturn_dark_indigo",     # 6 Shani
+    "rahu_smoke_grey",        # 7 Rahu
+    "ketu_ash_grey",          # 8 Ketu
+]
+
 _DIGNITY_STATUS_MAP = {
     5: "own_sign",
     4: "exalted",
@@ -193,6 +206,7 @@ def _build_planet_list(
                 id=planet_list_idx,
                 name=names["planet_names"][planet_list_idx],
                 symbol=const._planet_symbols[planet_list_idx + 1],
+                color=_PLANET_COLORS[planet_list_idx],
                 sign=names["sign_names"][sign_idx],
                 sign_index=sign_idx,
                 sign_symbol=const._zodiac_symbols[sign_idx],

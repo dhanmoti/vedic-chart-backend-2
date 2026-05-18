@@ -67,6 +67,7 @@ class PlanetInfo(BaseModel):
     id: int
     name: str
     symbol: str
+    color: str
     sign: str
     sign_index: int
     sign_symbol: str

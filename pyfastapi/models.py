@@ -1,6 +1,6 @@
 import re
 from datetime import date
-from typing import Dict, List, Optional
+from typing import Dict, List, Literal, Optional
 
 from pydantic import BaseModel, field_validator
 
@@ -12,6 +12,7 @@ class HoroscopeRequest(BaseModel):
     lng: float
     tz: float
     language: str = "en"
+    chart_style: Literal["north", "south"] = "south"
 
     @field_validator("dob")
     def validate_dob(cls, value):
@@ -50,17 +51,51 @@ class HoroscopeRequest(BaseModel):
 
 class NakshatraInfo(BaseModel):
     name: str
+    index: int
     pada: int
     lord: str
+    lord_symbol: str
+
+
+class DignityInfo(BaseModel):
+    status: str
+    score: int
+    label: str
+
+
+class PlanetInfo(BaseModel):
+    id: int
+    name: str
+    symbol: str
+    sign: str
+    sign_index: int
+    sign_symbol: str
+    house: int
+    longitude: float
+    longitude_in_sign: float
+    is_retrograde: bool
+    daily_motion: float
+    dignity: DignityInfo
+    nakshatra: NakshatraInfo
+
+
+class AscendantInfo(BaseModel):
+    sign: str
+    sign_index: int
+    sign_symbol: str
+    longitude: float
+    longitude_in_sign: float
+    lord: str
+    lord_symbol: str
+    nakshatra: NakshatraInfo
 
 
 class HoroscopeData(BaseModel):
-    placements: Dict[str, str]
+    meta: Dict[str, str]
+    ascendant: AscendantInfo
+    planets: List[PlanetInfo]
     charts: Dict[str, List[List[str]]]
-    house_indices: List[int]
-    ascendant_lord: Optional[str]
-    ascendant_nakshatra: Optional[NakshatraInfo]
-    nakshatras: Dict[str, Optional[NakshatraInfo]]
+    house_signs: List[int]
 
 
 class HoroscopeResponse(BaseModel):

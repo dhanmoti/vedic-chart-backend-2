@@ -7,6 +7,11 @@ from jhora import const
 
 logger = logging.getLogger("uvicorn.error")
 
+_PLANET_SYMBOLS_SET = set(const._planet_symbols)
+_ZODIAC_SYMBOLS_SET = set(const._zodiac_symbols)
+_VARIATION_SELECTORS = {0xFE0E, 0xFE0F}
+_RETRO_SYMBOL = const._retrogade_symbol  # '℞'
+
 
 class ChartCleaner:
     @staticmethod
@@ -16,6 +21,33 @@ class ChartCleaner:
             .replace("\n", " ")
             .strip()
         )
+
+    @staticmethod
+    def clean_unicode(text: str) -> str:
+        """Strip control characters and excess whitespace; preserve Unicode."""
+        return text.replace("\n", " ").replace("\r", " ").strip()
+
+    @staticmethod
+    def split_name_symbol(text: str) -> tuple:
+        """Split 'Sun☉' or 'सूर्य☉' into ('Sun', '☉').
+
+        jhora lang files store names as '{name}{symbol}' where the symbol
+        is a known planet symbol character appended at the end.
+        """
+        text = text.strip()
+        if text and text[-1] in _PLANET_SYMBOLS_SET:
+            return text[:-1].strip(), text[-1]
+        return text, ""
+
+    @staticmethod
+    def strip_zodiac_prefix(text: str) -> str:
+        """Strip leading zodiac symbol (and variation selectors) from '♈Aries' or '♑︎मकर'."""
+        i = 0
+        while i < len(text) and (
+            text[i] in _ZODIAC_SYMBOLS_SET or ord(text[i]) in _VARIATION_SELECTORS
+        ):
+            i += 1
+        return text[i:].strip()
 
     @staticmethod
     def format_response(raw_horoscope):
@@ -47,10 +79,19 @@ class ChartCleaner:
         }
 
     @staticmethod
+    def _clean_chart_planet(text: str) -> str:
+        text = ChartCleaner.clean_unicode(text)
+        text = text.replace(_RETRO_SYMBOL, "").strip()
+        name, _ = ChartCleaner.split_name_symbol(text)
+        if name and name[0] in _PLANET_SYMBOLS_SET:
+            name = name[1:].strip()
+        return name
+
+    @staticmethod
     def _clean_chart_houses(chart_houses):
         return [
             [
-                ChartCleaner.clean_text(p)
+                ChartCleaner._clean_chart_planet(p)
                 for p in house.split("\n")
                 if p.strip()
             ]

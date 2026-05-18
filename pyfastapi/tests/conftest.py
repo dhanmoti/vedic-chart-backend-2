@@ -36,4 +36,5 @@ def valid_payload():
         "lng": 77.5946,
         "tz": 5.5,
         "language": "en",
+        "chart_style": "south",
     }

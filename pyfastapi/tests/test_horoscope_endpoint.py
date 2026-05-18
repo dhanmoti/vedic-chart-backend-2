@@ -10,6 +10,32 @@ import services.horoscope_service as horoscope_service
 
 FIXTURE_PATH = Path(__file__).resolve().parents[1] / "horoscope_benchmark_cases.json"
 
+_MINIMAL_CACHED_PAYLOAD = {
+    "status": "success",
+    "data": {
+        "meta": {"chart_style": "south", "language": "en"},
+        "ascendant": {
+            "sign": "Aries",
+            "sign_index": 0,
+            "sign_symbol": "♈",
+            "longitude": 15.5,
+            "longitude_in_sign": 15.5,
+            "lord": "Mars",
+            "lord_symbol": "♂",
+            "nakshatra": {
+                "name": "Aswini",
+                "index": 1,
+                "pada": 2,
+                "lord": "Kethu",
+                "lord_symbol": "☋",
+            },
+        },
+        "planets": [],
+        "charts": {},
+        "house_signs": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+    },
+}
+
 
 def test_horoscope_benchmark_outputs_match_fixture_for_10_variations(app_client):
     cases = json.loads(FIXTURE_PATH.read_text())
@@ -25,7 +51,6 @@ def test_horoscope_requires_app_check_header(valid_payload):
     from main import app
     from fastapi.testclient import TestClient
 
-    # No dependency override — App Check must be enforced.
     with TestClient(app) as client:
         response = client.post("/horoscope", json=valid_payload)
 
@@ -40,18 +65,6 @@ def test_health_check_endpoint(app_client):
 
 
 def test_horoscope_returns_cached_payload_when_available(app_client, valid_payload):
-    cached_payload = {
-        "status": "success",
-        "data": {
-            "placements": {},
-            "charts": {},
-            "house_indices": [],
-            "ascendant_lord": None,
-            "ascendant_nakshatra": None,
-            "nakshatras": {"Raasi-Lagna": None},
-        },
-    }
-
     with (
         patch.object(
             horoscope_router.CACHE_SERVICE,
@@ -66,12 +79,14 @@ def test_horoscope_returns_cached_payload_when_available(app_client, valid_paylo
             },
         ),
         patch.object(horoscope_router.CACHE_SERVICE, "build_cache_key", return_value="dummy_key"),
-        patch.object(horoscope_router.CACHE_SERVICE, "get", return_value=cached_payload) as mock_get,
+        patch.object(
+            horoscope_router.CACHE_SERVICE, "get", return_value=_MINIMAL_CACHED_PAYLOAD
+        ) as mock_get,
     ):
         response = app_client.post("/horoscope", json=valid_payload)
 
     assert response.status_code == 200
-    assert response.json() == cached_payload
+    assert response.json() == _MINIMAL_CACHED_PAYLOAD
     mock_get.assert_called_once()
 
 
@@ -105,9 +120,102 @@ def test_horoscope_rejects_out_of_range_coordinates(app_client, valid_payload):
     )
 
 
+def test_horoscope_rejects_invalid_chart_style(app_client, valid_payload):
+    payload = {**valid_payload, "chart_style": "diagonal"}
+    response = app_client.post("/horoscope", json=payload)
+    assert response.status_code == 422
+
+
 def test_horoscope_returns_500_on_chart_generation_failure(app_client, valid_payload):
     with patch.object(horoscope_service, "Horoscope", side_effect=RuntimeError("boom")):
         response = app_client.post("/horoscope", json=valid_payload)
 
     assert response.status_code == 500
     assert response.json()["detail"] == "Internal error generating chart."
+
+
+def test_horoscope_returns_expected_response_shape(app_client, valid_payload):
+    response = app_client.post("/horoscope", json=valid_payload)
+    assert response.status_code == 200
+
+    body = response.json()
+    assert body["status"] == "success"
+
+    data = body["data"]
+    assert data["meta"]["chart_style"] == "south"
+    assert data["meta"]["language"] == "en"
+
+    asc = data["ascendant"]
+    assert isinstance(asc["sign"], str)
+    assert isinstance(asc["sign_index"], int)
+    assert isinstance(asc["sign_symbol"], str)
+    assert isinstance(asc["longitude"], float)
+    assert isinstance(asc["longitude_in_sign"], float)
+    assert isinstance(asc["lord"], str)
+    assert isinstance(asc["lord_symbol"], str)
+    assert isinstance(asc["nakshatra"]["name"], str)
+    assert isinstance(asc["nakshatra"]["index"], int)
+    assert isinstance(asc["nakshatra"]["pada"], int)
+
+    planets = data["planets"]
+    assert len(planets) == 9
+    first = planets[0]
+    assert first["id"] == 0
+    assert first["name"] == "Sun"
+    assert first["symbol"] == "☉"
+    assert isinstance(first["sign"], str)
+    assert isinstance(first["sign_index"], int)
+    assert isinstance(first["house"], int) and 1 <= first["house"] <= 12
+    assert isinstance(first["longitude"], float)
+    assert isinstance(first["is_retrograde"], bool)
+    assert isinstance(first["daily_motion"], float)
+    assert first["dignity"]["status"] in {
+        "exalted", "own_sign", "moolatrikona", "friend", "neutral", "enemy", "debilitated"
+    }
+    assert 0 <= first["dignity"]["score"] <= 5
+    assert isinstance(first["nakshatra"]["name"], str)
+
+    house_signs = data["house_signs"]
+    assert len(house_signs) == 12
+    assert all(0 <= s <= 11 for s in house_signs)
+
+    assert "D1" in data["charts"]
+    assert len(data["charts"]["D1"]) == 12
+
+
+def test_horoscope_north_style_fixes_rahu_ketu_names(app_client, valid_payload):
+    payload = {**valid_payload, "chart_style": "north", "language": "en"}
+    response = app_client.post("/horoscope", json=payload)
+    assert response.status_code == 200
+
+    planets = response.json()["data"]["planets"]
+    rahu = planets[7]
+    ketu = planets[8]
+    assert rahu["name"] == "Rahu", f"Expected 'Rahu', got '{rahu['name']}'"
+    assert ketu["name"] == "Ketu", f"Expected 'Ketu', got '{ketu['name']}'"
+
+
+def test_horoscope_north_style_uses_sanskrit_nakshatra_names(app_client, valid_payload):
+    payload = {**valid_payload, "chart_style": "north", "language": "en"}
+    response = app_client.post("/horoscope", json=payload)
+    assert response.status_code == 200
+
+    planets = response.json()["data"]["planets"]
+    all_nakshatra_names = {p["nakshatra"]["name"] for p in planets}
+    # None of the Tamil-style names should appear in north style
+    tamil_style = {"Aswini", "Karthigai", "Mrigasheesham", "Thiruvaathirai", "Punarpoosam"}
+    assert not all_nakshatra_names.intersection(tamil_style), (
+        f"Tamil names found in north style: {all_nakshatra_names.intersection(tamil_style)}"
+    )
+
+
+def test_horoscope_south_style_preserves_tamil_rahu_ketu(app_client, valid_payload):
+    payload = {**valid_payload, "chart_style": "south", "language": "en"}
+    response = app_client.post("/horoscope", json=payload)
+    assert response.status_code == 200
+
+    planets = response.json()["data"]["planets"]
+    rahu = planets[7]
+    ketu = planets[8]
+    assert rahu["name"] == "Raagu", f"Expected 'Raagu', got '{rahu['name']}'"
+    assert ketu["name"] == "Kethu", f"Expected 'Kethu', got '{ketu['name']}'"

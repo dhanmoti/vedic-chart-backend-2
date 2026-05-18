@@ -1,12 +1,14 @@
 import logging
+import os
 import time
 import traceback
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 
 from cache_service import CacheConfig, HoroscopeCacheService
 from dependencies import verify_app_check
+from limiter import limiter
 from models import HoroscopeRequest, HoroscopeResponse
 from services import horoscope_service
 
@@ -85,7 +87,9 @@ router = APIRouter()
         }
     },
 )
+@limiter.limit(os.getenv("RATE_LIMIT_DEFAULT", "30/minute"))
 async def get_horoscope(
+    request: Request,
     data: HoroscopeRequest,
     app_check_claims=Depends(verify_app_check),
 ) -> HoroscopeResponse:

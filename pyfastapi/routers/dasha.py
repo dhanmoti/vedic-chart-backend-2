@@ -4,11 +4,12 @@ import os
 import time
 import traceback
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 
 from cache_service import CacheConfig, HoroscopeCacheService
 from dependencies import verify_app_check
+from limiter import limiter
 from models import DashaResponse, HoroscopeRequest
 from services import dasha_service
 
@@ -34,7 +35,8 @@ router = APIRouter()
     ),
     dependencies=[Depends(verify_app_check)],
 )
-async def get_dasha(data: HoroscopeRequest) -> DashaResponse:
+@limiter.limit(os.getenv("RATE_LIMIT_DEFAULT", "30/minute"))
+async def get_dasha(request: Request, data: HoroscopeRequest) -> DashaResponse:
     compute_started = time.perf_counter()
     try:
         normalized_key_fields = CACHE_SERVICE.normalize_key_fields(

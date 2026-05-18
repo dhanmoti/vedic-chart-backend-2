@@ -1,6 +1,11 @@
 import config  # noqa: F401  — side-effects: ephemeris init, logging, varga_option_dict
 
 from fastapi import FastAPI
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+
+from limiter import limiter
 from routers import horoscope as horoscope_router
 from routers import system as system_router
 from routers import dasha as dasha_router
@@ -11,6 +16,9 @@ from routers import yogas as yogas_router
 
 
 app = FastAPI()
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 app.include_router(horoscope_router.router)
 app.include_router(system_router.router)

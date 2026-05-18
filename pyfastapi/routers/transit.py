@@ -4,11 +4,12 @@ import os
 import time
 import traceback
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 
 from cache_service import CacheConfig, HoroscopeCacheService
 from dependencies import verify_app_check
+from limiter import limiter
 from models import GocharRequest, GocharResponse, VarshaRequest, VarshaResponse
 from services import gochar_service, varsha_service
 
@@ -41,7 +42,8 @@ router = APIRouter()
     ),
     dependencies=[Depends(verify_app_check)],
 )
-async def get_gochar(data: GocharRequest) -> GocharResponse:
+@limiter.limit(os.getenv("RATE_LIMIT_DEFAULT", "30/minute"))
+async def get_gochar(request: Request, data: GocharRequest) -> GocharResponse:
     compute_started = time.perf_counter()
     try:
         normalized_key_fields = GOCHAR_CACHE.normalize_key_fields(
@@ -86,7 +88,8 @@ async def get_gochar(data: GocharRequest) -> GocharResponse:
     ),
     dependencies=[Depends(verify_app_check)],
 )
-async def get_varsha(data: VarshaRequest) -> VarshaResponse:
+@limiter.limit(os.getenv("RATE_LIMIT_DEFAULT", "30/minute"))
+async def get_varsha(request: Request, data: VarshaRequest) -> VarshaResponse:
     compute_started = time.perf_counter()
     try:
         normalized_key_fields = VARSHA_CACHE.normalize_key_fields(

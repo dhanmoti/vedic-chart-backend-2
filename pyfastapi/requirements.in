@@ -9,3 +9,4 @@ python-dateutil==2.9.0.post0
 pyswisseph==2.10.3.2
 pyjhora==4.6.0
 firebase_admin==7.3.0
+slowapi

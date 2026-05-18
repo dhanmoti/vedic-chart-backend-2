@@ -7,6 +7,17 @@ from jhora import const
 
 logger = logging.getLogger("uvicorn.error")
 
+NORTH_EN_PLANET_NAME_FIXES: Dict[str, str] = {"Raagu": "Rahu", "Kethu": "Ketu"}
+
+NORTH_EN_NAKSHATRA_NAMES: List[str] = [
+    "Ashvini", "Bharani", "Krittika", "Rohini", "Mrigashirsha",
+    "Ardra", "Punarvasu", "Pushya", "Ashlesha", "Magha",
+    "Purva Phalguni", "Uttara Phalguni", "Hasta", "Chitra", "Svati",
+    "Vishakha", "Anuradha", "Jyeshtha", "Mula", "Purvashadha",
+    "Uttarashadha", "Shravana", "Dhanishtha", "Shatabhisha",
+    "Purva Bhadrapada", "Uttara Bhadrapada", "Revati", "Abhijit",
+]
+
 _PLANET_SYMBOLS_SET = set(const._planet_symbols)
 _ZODIAC_SYMBOLS_SET = set(const._zodiac_symbols)
 _VARIATION_SELECTORS = {0xFE0E, 0xFE0F}

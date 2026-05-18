@@ -5,6 +5,7 @@ from jhora import utils
 from jhora.panchanga import drik
 
 from config import suppress_third_party_stdout
+from helpers import NORTH_EN_NAKSHATRA_NAMES
 from models import PanchangaRequest
 
 logger = logging.getLogger("uvicorn.error")
@@ -27,7 +28,7 @@ _LUNAR_MONTH_NAMES = [
 ]
 
 
-def _get_name_lists(language: str):
+def _get_name_lists(language: str, chart_style: str):
     with suppress_third_party_stdout():
         utils.set_language(language)
     tithi_names = [utils.TITHI_LIST[i] for i in range(min(30, len(utils.TITHI_LIST)))]
@@ -36,6 +37,8 @@ def _get_name_lists(language: str):
     if language != "en":
         with suppress_third_party_stdout():
             utils.set_language("en")
+    if chart_style == "north" and language == "en":
+        nak_names = list(NORTH_EN_NAKSHATRA_NAMES)
     return tithi_names, nak_names, karana_names
 
 
@@ -53,7 +56,7 @@ def build_panchanga_payload(data: PanchangaRequest) -> Dict:
     place = drik.Place("", data.lat, data.lng, data.tz)
     jd = utils.julian_day_number(date_in, (hour, minute, 0))
 
-    tithi_names, nak_names, karana_names = _get_name_lists(data.language)
+    tithi_names, nak_names, karana_names = _get_name_lists(data.language, data.chart_style)
 
     with suppress_third_party_stdout():
         tithi_result = drik.tithi(jd, place)

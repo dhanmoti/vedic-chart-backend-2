@@ -45,6 +45,7 @@ async def get_panchanga(data: PanchangaRequest) -> PanchangaResponse:
             tz=data.tz,
             language=data.language,
         )
+        normalized_key_fields["chart_style"] = data.chart_style
         cache_key = CACHE_SERVICE.build_cache_key(normalized_key_fields)
         cached_payload = CACHE_SERVICE.get(cache_key)
         if cached_payload is not None:

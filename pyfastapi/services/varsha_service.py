@@ -6,13 +6,13 @@ from jhora.horoscope.transit import tajaka
 from jhora.panchanga import drik
 
 from config import suppress_third_party_stdout
-from helpers import ChartCleaner
+from helpers import ChartCleaner, NORTH_EN_PLANET_NAME_FIXES
 from models import VarshaRequest
 
 logger = logging.getLogger("uvicorn.error")
 
 
-def _load_planet_names(language: str) -> List[str]:
+def _load_planet_names(language: str, chart_style: str) -> List[str]:
     with suppress_third_party_stdout():
         utils.set_language(language)
     names = []
@@ -23,6 +23,8 @@ def _load_planet_names(language: str) -> List[str]:
     if language != "en":
         with suppress_third_party_stdout():
             utils.set_language("en")
+    if chart_style == "north" and language == "en":
+        names = [NORTH_EN_PLANET_NAME_FIXES.get(n, n) for n in names]
     return names
 
 
@@ -55,7 +57,7 @@ def build_varsha_payload(data: VarshaRequest) -> Dict:
     chart_date_tuple = chart_date_info[0]
     chart_date = f"{chart_date_tuple[0]:04d}-{chart_date_tuple[1]:02d}-{chart_date_tuple[2]:02d}"
 
-    planet_names = _load_planet_names(data.language)
+    planet_names = _load_planet_names(data.language, data.chart_style)
     house_chart = _positions_to_house_chart(positions, planet_names)
 
     return {

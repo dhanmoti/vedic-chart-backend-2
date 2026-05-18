@@ -32,27 +32,52 @@ router = APIRouter()
                     "example": {
                         "status": "success",
                         "data": {
-                            "placements": {
-                                "Raasi-Lagna": "Aquarius",
-                                "Raasi-Sun": "Capricorn",
-                            },
-                            "charts": {
-                                "D1": [["Lagna"], ["Sun"]],
-                            },
-                            "house_indices": [10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8, 9],
-                            "ascendant_lord": "Saturn",
-                            "ascendant_nakshatra": {
-                                "name": "Shatabhisha",
-                                "pada": 1,
-                                "lord": "Rahu",
-                            },
-                            "nakshatras": {
-                                "Raasi-Lagna": {
-                                    "name": "Shatabhisha",
+                            "meta": {"chart_style": "south", "language": "en"},
+                            "ascendant": {
+                                "sign": "Aquarius",
+                                "sign_index": 10,
+                                "sign_symbol": "♒",
+                                "longitude": 315.2,
+                                "longitude_in_sign": 15.2,
+                                "lord": "Saturn",
+                                "lord_symbol": "♄",
+                                "nakshatra": {
+                                    "name": "Sadhayam",
+                                    "index": 24,
                                     "pada": 1,
-                                    "lord": "Rahu",
+                                    "lord": "Raagu",
+                                    "lord_symbol": "☊",
                                 },
                             },
+                            "planets": [
+                                {
+                                    "id": 0,
+                                    "name": "Sun",
+                                    "symbol": "☉",
+                                    "sign": "Capricorn",
+                                    "sign_index": 9,
+                                    "sign_symbol": "♑︎",
+                                    "house": 12,
+                                    "longitude": 280.5,
+                                    "longitude_in_sign": 10.5,
+                                    "is_retrograde": False,
+                                    "daily_motion": 0.986,
+                                    "dignity": {
+                                        "status": "debilitated",
+                                        "score": 0,
+                                        "label": "Neecham/Defibilated",
+                                    },
+                                    "nakshatra": {
+                                        "name": "Uthiraadam",
+                                        "index": 21,
+                                        "pada": 3,
+                                        "lord": "Sun",
+                                        "lord_symbol": "☉",
+                                    },
+                                }
+                            ],
+                            "charts": {"D1": [["Lagna"], ["Sun"]]},
+                            "house_signs": [10, 11, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
                         },
                     }
                 }
@@ -75,6 +100,7 @@ async def get_horoscope(
             tz=data.tz,
             language=data.language,
         )
+        normalized_key_fields["chart_style"] = data.chart_style
         cache_key = CACHE_SERVICE.build_cache_key(normalized_key_fields)
         cached_payload = CACHE_SERVICE.get(cache_key)
         if cached_payload is not None:

@@ -63,6 +63,17 @@ def test_gochar_returns_500_on_service_failure(app_client, valid_payload):
     assert response.json()["detail"] == "Internal error generating gochar."
 
 
+def test_gochar_north_style_en_uses_corrected_planet_names(app_client, valid_payload):
+    payload = {**valid_payload, "transit_date": "2025-01-01", "chart_style": "north", "language": "en"}
+    response = app_client.post("/transit/gochar", json=payload)
+    assert response.status_code == 200
+    planet_names = [p["name"] for p in response.json()["data"]["transit_planets"]]
+    assert "Rahu" in planet_names
+    assert "Ketu" in planet_names
+    assert "Raagu" not in planet_names
+    assert "Kethu" not in planet_names
+
+
 def test_gochar_returns_expected_response_shape(app_client, valid_payload):
     payload = {**valid_payload, "transit_date": "2025-01-01"}
     response = app_client.post("/transit/gochar", json=payload)

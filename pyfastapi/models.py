@@ -2,7 +2,7 @@ import re
 from datetime import date
 from typing import Dict, List, Literal, Optional
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class HoroscopeRequest(BaseModel):
@@ -135,3 +135,165 @@ class DashaData(BaseModel):
 class DashaResponse(BaseModel):
     status: str
     data: DashaData
+
+
+class GocharRequest(BaseModel):
+    dob: str = Field(..., description="Date of birth (YYYY-MM-DD)")
+    time: str = Field(..., description="Time of birth in 24-hour format (HH:MM)")
+    lat: float = Field(..., ge=-90.0, le=90.0, description="Latitude (-90 to 90)")
+    lng: float = Field(..., ge=-180.0, le=180.0, description="Longitude (-180 to 180)")
+    tz: float = Field(..., ge=-14.0, le=14.0, description="Timezone offset in hours (-14 to 14)")
+    language: str = Field("en", description="Language code for output labels")
+    chart_style: Literal["north", "south"] = Field("south", description="Chart style: 'north' uses Sanskrit English planet/nakshatra names, 'south' uses standard transliteration")
+    transit_date: str = Field(..., description="Date to compute planetary positions for (YYYY-MM-DD)")
+    transit_time: str = Field("12:00", description="Time of transit calculation in 24-hour format (HH:MM), defaults to noon")
+
+    @field_validator("dob", "transit_date")
+    def validate_date_format(cls, value):
+        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", value):
+            raise ValueError("date must match YYYY-MM-DD format")
+        date.fromisoformat(value)
+        return value
+
+    @field_validator("time", "transit_time")
+    def validate_time_format(cls, value):
+        if not re.fullmatch(r"\d{2}:\d{2}", value):
+            raise ValueError("time must match HH:MM format")
+        hour, minute = [int(p) for p in value.split(":")]
+        if not (0 <= hour < 24 and 0 <= minute < 60):
+            raise ValueError("time must be between 00:00 and 23:59")
+        return value
+
+
+class TransitPlanetInfo(BaseModel):
+    name: str
+    longitude: float
+    sign: int
+    sign_name: str
+    nakshatra: str
+    pada: int
+    house_from_lagna: int
+    house_from_moon: int
+    is_retrograde: bool
+
+
+class GocharData(BaseModel):
+    transit_date: str
+    natal_lagna_sign: int
+    natal_moon_sign: int
+    transit_planets: List[TransitPlanetInfo]
+
+
+class GocharResponse(BaseModel):
+    status: str
+    data: GocharData
+
+
+class VarshaRequest(BaseModel):
+    dob: str = Field(..., description="Date of birth (YYYY-MM-DD)")
+    time: str = Field(..., description="Time of birth in 24-hour format (HH:MM)")
+    lat: float = Field(..., ge=-90.0, le=90.0, description="Latitude (-90 to 90)")
+    lng: float = Field(..., ge=-180.0, le=180.0, description="Longitude (-180 to 180)")
+    tz: float = Field(..., ge=-14.0, le=14.0, description="Timezone offset in hours (-14 to 14)")
+    language: str = Field("en", description="Language code for output labels")
+    chart_style: Literal["north", "south"] = Field("south", description="Chart style: 'north' uses Sanskrit English planet names, 'south' uses standard transliteration")
+    year: int = Field(..., ge=1, le=120, description="Year of life for the annual chart (e.g. 35 for the 35th year)")
+
+    @field_validator("dob")
+    def validate_dob(cls, value):
+        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", value):
+            raise ValueError("dob must match YYYY-MM-DD format")
+        date.fromisoformat(value)
+        return value
+
+    @field_validator("time")
+    def validate_time(cls, value):
+        if not re.fullmatch(r"\d{2}:\d{2}", value):
+            raise ValueError("time must match HH:MM format")
+        hour, minute = [int(p) for p in value.split(":")]
+        if not (0 <= hour < 24 and 0 <= minute < 60):
+            raise ValueError("time must be between 00:00 and 23:59")
+        return value
+
+
+class VarshaData(BaseModel):
+    year: int
+    chart_date: str
+    chart: List[List[str]]
+
+
+class VarshaResponse(BaseModel):
+    status: str
+    data: VarshaData
+
+
+class PanchangaRequest(BaseModel):
+    date: str = Field(..., description="Date for panchanga calculation (YYYY-MM-DD)")
+    time: str = Field("06:00", description="Time of day in 24-hour format (HH:MM), defaults to 06:00")
+    lat: float = Field(..., ge=-90.0, le=90.0, description="Latitude (-90 to 90)")
+    lng: float = Field(..., ge=-180.0, le=180.0, description="Longitude (-180 to 180)")
+    tz: float = Field(..., ge=-14.0, le=14.0, description="Timezone offset in hours (-14 to 14)")
+    language: str = Field("en", description="Language code for output labels")
+    chart_style: Literal["north", "south"] = Field("south", description="Chart style: 'north' uses Sanskrit English nakshatra names, 'south' uses standard transliteration")
+
+    @field_validator("date")
+    def validate_date(cls, value):
+        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", value):
+            raise ValueError("date must match YYYY-MM-DD format")
+        date.fromisoformat(value)
+        return value
+
+    @field_validator("time")
+    def validate_time(cls, value):
+        if not re.fullmatch(r"\d{2}:\d{2}", value):
+            raise ValueError("time must match HH:MM format")
+        hour, minute = [int(p) for p in value.split(":")]
+        if not (0 <= hour < 24 and 0 <= minute < 60):
+            raise ValueError("time must be between 00:00 and 23:59")
+        return value
+
+
+class PanchangaData(BaseModel):
+    date: str
+    vaara: str
+    tithi: str
+    tithi_index: int
+    nakshatra: str
+    nakshatra_index: int
+    yoga: str
+    yoga_index: int
+    karana: str
+    karana_index: int
+    lunar_month: str
+    sunrise: str
+    sunset: str
+
+
+class PanchangaResponse(BaseModel):
+    status: str
+    data: PanchangaData
+
+
+class AshtakavargaData(BaseModel):
+    binna: Dict[str, List[int]]
+    samudaya: List[int]
+
+
+class AshtakavargaResponse(BaseModel):
+    status: str
+    data: AshtakavargaData
+
+
+class YogaResult(BaseModel):
+    name: str
+    planet: Optional[str]
+    present: bool
+
+
+class YogasData(BaseModel):
+    yogas: List[YogaResult]
+
+
+class YogasResponse(BaseModel):
+    status: str
+    data: YogasData

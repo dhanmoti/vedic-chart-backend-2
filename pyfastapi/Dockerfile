@@ -9,7 +9,7 @@ WORKDIR /app
 COPY requirements.txt ./requirements.txt
 RUN pip wheel --no-cache-dir --wheel-dir /wheels -r requirements.txt
 
-COPY main.py config.py dependencies.py models.py cache_service.py helpers.py requirements.txt ./
+COPY main.py config.py dependencies.py models.py cache_service.py helpers.py limiter.py requirements.txt ./
 COPY routers ./routers
 COPY services ./services
 COPY jhora ./jhora
@@ -33,6 +33,7 @@ COPY --from=builder /app/dependencies.py ./dependencies.py
 COPY --from=builder /app/models.py ./models.py
 COPY --from=builder /app/cache_service.py ./cache_service.py
 COPY --from=builder /app/helpers.py ./helpers.py
+COPY --from=builder /app/limiter.py ./limiter.py
 COPY --from=builder /app/routers ./routers
 COPY --from=builder /app/services ./services
 COPY --from=builder /app/jhora ./jhora

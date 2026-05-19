@@ -33,6 +33,7 @@ _MINIMAL_CACHED_PAYLOAD = {
         "planets": [],
         "charts": {},
         "house_signs": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+        "divisions": {},
     },
 }
 
@@ -181,6 +182,23 @@ def test_horoscope_returns_expected_response_shape(app_client, valid_payload):
 
     assert "D1" in data["charts"]
     assert len(data["charts"]["D1"]) == 12
+
+    assert "divisions" in data
+    assert "D9" in data["divisions"]
+    d9_planets = data["divisions"]["D9"]["planets"]
+    assert len(d9_planets) == 9
+    dp = d9_planets[0]
+    assert isinstance(dp["id"], int)
+    assert isinstance(dp["name"], str)
+    assert isinstance(dp["symbol"], str)
+    assert isinstance(dp["sign"], str)
+    assert 0 <= dp["sign_index"] <= 11
+    assert 0.0 <= dp["longitude_in_sign"] < 30.0
+    assert 1 <= dp["house"] <= 12
+    assert "D2" in data["divisions"]
+    assert len(data["divisions"]["D2"]["planets"]) == 9
+    for d2p in data["divisions"]["D2"]["planets"]:
+        assert d2p["sign_index"] in {3, 4}, f"D2 planet must be Cancer or Leo, got {d2p['sign_index']}"
 
 
 def test_horoscope_north_style_fixes_rahu_ketu_names(app_client, valid_payload):

@@ -1,4 +1,5 @@
 import logging
+import re
 from typing import Dict, List, Tuple
 
 from jhora import const, utils
@@ -8,8 +9,8 @@ from jhora.panchanga import drik
 
 from config import configure_ephemeris_path, ephe_path, suppress_third_party_stdout
 from helpers import ChartCleaner
-from models import AscendantInfo, DignityInfo, HoroscopeRequest, NakshatraInfo, PlanetInfo
-from services.chart_service import traditional_parasara_hora_from_rasi_positions
+from models import AscendantInfo, DignityInfo, DivisionChartInfo, DivisionPlanetInfo, HoroscopeRequest, NakshatraInfo, PlanetInfo
+from services.chart_service import parse_longitude_from_placement, traditional_parasara_hora_from_rasi_positions
 
 
 logger = logging.getLogger("uvicorn.error")
@@ -234,6 +235,100 @@ def _apply_north_en_chart_fixes(charts_data: Dict) -> Dict:
     }
 
 
+def _build_divisions(
+    placements: Dict[str, str],
+    planet_list: List[PlanetInfo],
+    d2_chart: List[List[str]],
+    names: Dict[str, List[str]],
+) -> Dict[str, DivisionChartInfo]:
+    # Map raw pyjhora planet name (after clean_text) → planet_list index
+    raw_name_to_idx: Dict[str, int] = {}
+    for i in range(min(9, len(utils.PLANET_NAMES))):
+        raw, _ = ChartCleaner.split_name_symbol(utils.PLANET_NAMES[i])
+        raw_name_to_idx[ChartCleaner.clean_text(raw)] = i
+
+    # Per-division intermediate storage
+    div_planet_data: Dict[str, Dict[int, tuple]] = {}  # div_code → {planet_idx: (sign_idx, long_in_sign)}
+    div_lagna: Dict[str, int] = {}  # div_code → divisional lagna sign index
+
+    _ASCENDANT_SUFFIXES = {"Ascendant", "Lagna"}
+
+    for key, value in placements.items():
+        m = re.match(r"^.*?\((D\d+)\)-(.+)$", key)
+        if not m:
+            continue
+        div_code = m.group(1)
+        item_name = m.group(2).strip()
+        longitude = parse_longitude_from_placement(value)
+        if longitude is None:
+            continue
+        sign_idx = int(longitude / 30) % 12
+        long_in_sign = round(longitude % 30, 4)
+        if item_name in _ASCENDANT_SUFFIXES:
+            div_lagna[div_code] = sign_idx
+            continue
+        planet_idx = raw_name_to_idx.get(item_name)
+        if planet_idx is None:
+            continue
+        div_planet_data.setdefault(div_code, {})[planet_idx] = (sign_idx, long_in_sign)
+
+    # Assemble DivisionChartInfo for each division that has a lagna and all 9 planets
+    result: Dict[str, DivisionChartInfo] = {}
+    for div_code, planet_map in div_planet_data.items():
+        lagna_sign = div_lagna.get(div_code)
+        if lagna_sign is None:
+            continue
+        planets_out = []
+        for planet_idx in range(9):
+            if planet_idx not in planet_map:
+                continue
+            sign_idx, long_in_sign = planet_map[planet_idx]
+            p = planet_list[planet_idx]
+            planets_out.append(DivisionPlanetInfo(
+                id=p.id,
+                name=p.name,
+                symbol=p.symbol,
+                sign=names["sign_names"][sign_idx],
+                sign_index=sign_idx,
+                sign_symbol=const._zodiac_symbols[sign_idx],
+                longitude_in_sign=long_in_sign,
+                house=(sign_idx - lagna_sign) % 12 + 1,
+            ))
+        if planets_out:
+            result[div_code] = DivisionChartInfo(planets=planets_out)
+
+    # Override D2 with Traditional Parasara data
+    d2_lagna_sign = next(
+        (h for h, names_in_house in enumerate(d2_chart) if "Ascendant" in names_in_house),
+        None,
+    )
+    if d2_lagna_sign is not None:
+        d2_planets = []
+        for planet_idx, p in enumerate(planet_list):
+            raw_name, _ = ChartCleaner.split_name_symbol(utils.PLANET_NAMES[planet_idx])
+            raw_cleaned = ChartCleaner.clean_text(raw_name)
+            house_idx = next(
+                (h for h, names_in_house in enumerate(d2_chart) if raw_cleaned in names_in_house),
+                None,
+            )
+            if house_idx is None:
+                continue
+            long_in_sign = round((p.longitude_in_sign * 2) % 30, 4)
+            d2_planets.append(DivisionPlanetInfo(
+                id=p.id,
+                name=p.name,
+                symbol=p.symbol,
+                sign=names["sign_names"][house_idx],
+                sign_index=house_idx,
+                sign_symbol=const._zodiac_symbols[house_idx],
+                longitude_in_sign=long_in_sign,
+                house=(house_idx - d2_lagna_sign) % 12 + 1,
+            ))
+        result["D2"] = DivisionChartInfo(planets=d2_planets)
+
+    return result
+
+
 def build_horoscope_payload(data: HoroscopeRequest) -> Dict[str, object]:
     year, month, day = [int(p) for p in data.dob.split("-")]
     hour, minute = [int(p) for p in data.time.split(":")]
@@ -277,6 +372,13 @@ def build_horoscope_payload(data: HoroscopeRequest) -> Dict[str, object]:
     if data.chart_style == "north" and data.language == "en":
         chart_data = _apply_north_en_chart_fixes(chart_data)
 
+    divisions = _build_divisions(
+        cleaned["placements"],
+        planet_list,
+        cleaned["charts"]["D2"],
+        names,
+    )
+
     return {
         "status": "success",
         "data": {
@@ -288,5 +390,6 @@ def build_horoscope_payload(data: HoroscopeRequest) -> Dict[str, object]:
             "planets": planet_list,
             "charts": chart_data,
             "house_signs": house_signs,
+            "divisions": divisions,
         },
     }

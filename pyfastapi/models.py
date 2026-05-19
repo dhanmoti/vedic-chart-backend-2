@@ -91,12 +91,28 @@ class AscendantInfo(BaseModel):
     nakshatra: NakshatraInfo
 
 
+class DivisionPlanetInfo(BaseModel):
+    id: int
+    name: str
+    symbol: str
+    sign: str
+    sign_index: int
+    sign_symbol: str
+    longitude_in_sign: float
+    house: int
+
+
+class DivisionChartInfo(BaseModel):
+    planets: List[DivisionPlanetInfo]
+
+
 class HoroscopeData(BaseModel):
     meta: Dict[str, str]
     ascendant: AscendantInfo
     planets: List[PlanetInfo]
     charts: Dict[str, List[List[str]]]
     house_signs: List[int]
+    divisions: Dict[str, DivisionChartInfo]
 
 
 class HoroscopeResponse(BaseModel):

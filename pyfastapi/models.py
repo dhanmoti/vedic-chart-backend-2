@@ -78,6 +78,7 @@ class PlanetInfo(BaseModel):
     daily_motion: float
     dignity: DignityInfo
     nakshatra: NakshatraInfo
+    jaimini_karaka: Optional[str] = None
 
 
 class AscendantInfo(BaseModel):
@@ -100,6 +101,7 @@ class DivisionPlanetInfo(BaseModel):
     sign_symbol: str
     longitude_in_sign: float
     house: int
+    jaimini_karaka: Optional[str] = None
 
 
 class DivisionChartInfo(BaseModel):

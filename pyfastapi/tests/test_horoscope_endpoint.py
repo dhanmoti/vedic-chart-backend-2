@@ -200,6 +200,12 @@ def test_horoscope_returns_expected_response_shape(app_client, valid_payload):
     for d2p in data["divisions"]["D2"]["planets"]:
         assert d2p["sign_index"] in {3, 4}, f"D2 planet must be Cancer or Leo, got {d2p['sign_index']}"
 
+    karaka_values = {p["jaimini_karaka"] for p in planets}
+    assert None in karaka_values
+    assert any(v is not None for v in karaka_values)
+    assert any(p["jaimini_karaka"] is not None for p in data["divisions"]["D9"]["planets"])
+    assert all(p["jaimini_karaka"] is None for p in data["divisions"]["D2"]["planets"])
+
 
 def test_horoscope_north_style_fixes_rahu_ketu_names(app_client, valid_payload):
     payload = {**valid_payload, "chart_style": "north", "language": "en"}

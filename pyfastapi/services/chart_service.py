@@ -7,6 +7,12 @@ from config import _SIGN_TO_INDEX
 from helpers import ChartCleaner
 
 
+def parse_karaka_from_placement(placement_value: str) -> Optional[str]:
+    """Extract Jaimini Karaka from placement string e.g. '... (Maitra Karaka)'."""
+    m = re.search(r"\(([^)]+Karaka)\)", placement_value)
+    return m.group(1) if m else None
+
+
 def parse_longitude_from_placement(placement_value: str) -> Optional[float]:
     """Parse ecliptic longitude (degrees) from a zodiac placement string."""
     match = re.search(

@@ -10,7 +10,7 @@ from jhora.panchanga import drik
 from config import configure_ephemeris_path, ephe_path, suppress_third_party_stdout
 from helpers import ChartCleaner
 from models import AscendantInfo, DignityInfo, DivisionChartInfo, DivisionPlanetInfo, HoroscopeRequest, NakshatraInfo, PlanetInfo
-from services.chart_service import parse_longitude_from_placement, traditional_parasara_hora_from_rasi_positions
+from services.chart_service import parse_karaka_from_placement, parse_longitude_from_placement, traditional_parasara_hora_from_rasi_positions
 
 
 logger = logging.getLogger("uvicorn.error")
@@ -270,7 +270,8 @@ def _build_divisions(
         planet_idx = raw_name_to_idx.get(item_name)
         if planet_idx is None:
             continue
-        div_planet_data.setdefault(div_code, {})[planet_idx] = (sign_idx, long_in_sign)
+        karaka = parse_karaka_from_placement(value)
+        div_planet_data.setdefault(div_code, {})[planet_idx] = (sign_idx, long_in_sign, karaka)
 
     # Assemble DivisionChartInfo for each division that has a lagna and all 9 planets
     result: Dict[str, DivisionChartInfo] = {}
@@ -282,7 +283,7 @@ def _build_divisions(
         for planet_idx in range(9):
             if planet_idx not in planet_map:
                 continue
-            sign_idx, long_in_sign = planet_map[planet_idx]
+            sign_idx, long_in_sign, karaka = planet_map[planet_idx]
             p = planet_list[planet_idx]
             planets_out.append(DivisionPlanetInfo(
                 id=p.id,
@@ -293,6 +294,7 @@ def _build_divisions(
                 sign_symbol=const._zodiac_symbols[sign_idx],
                 longitude_in_sign=long_in_sign,
                 house=(sign_idx - lagna_sign) % 12 + 1,
+                jaimini_karaka=karaka,
             ))
         if planets_out:
             result[div_code] = DivisionChartInfo(planets=planets_out)
@@ -367,6 +369,17 @@ def build_horoscope_payload(data: HoroscopeRequest) -> Dict[str, object]:
     ascendant_info, asc_sign_idx = _build_ascendant(jd_local, place, names)
     planet_list = _build_planet_list(jd_local, jd_utc, place, asc_sign_idx, names)
     house_signs = _compute_house_signs(asc_sign_idx)
+
+    # Attach Jaimini Karaka from D1 placements to each planet
+    raw_names = []
+    for i in range(min(9, len(utils.PLANET_NAMES))):
+        raw, _ = ChartCleaner.split_name_symbol(utils.PLANET_NAMES[i])
+        raw_names.append(ChartCleaner.clean_text(raw))
+    for planet_info in planet_list:
+        key = f"Raasi-{raw_names[planet_info.id]}"
+        value = cleaned["placements"].get(key)
+        if value:
+            planet_info.jaimini_karaka = parse_karaka_from_placement(value)
 
     chart_data = cleaned["charts"]
     if data.chart_style == "north" and data.language == "en":

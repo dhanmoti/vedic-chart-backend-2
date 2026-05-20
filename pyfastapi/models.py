@@ -5,6 +5,16 @@ from typing import Dict, List, Literal, Optional
 from pydantic import BaseModel, Field, field_validator
 
 
+class LanguageEntry(BaseModel):
+    code: str
+    name: str
+
+
+class LanguagesResponse(BaseModel):
+    status: str
+    data: List[LanguageEntry]
+
+
 class HoroscopeRequest(BaseModel):
     dob: str
     time: str

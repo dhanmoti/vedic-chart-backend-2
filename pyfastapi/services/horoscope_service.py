@@ -79,9 +79,8 @@ def _load_names(language: str, chart_style: str) -> Dict[str, List[str]]:
         else:
             nakshatra_names.append(f"Nakshatra{i + 1}")
 
-    if language != "en":
-        with suppress_third_party_stdout():
-            utils.set_language("en")
+    with suppress_third_party_stdout():
+        utils.set_language("en")
 
     if chart_style == "north" and language == "en":
         planet_names = [_NORTH_EN_PLANET_NAME_FIXES.get(n, n) for n in planet_names]
@@ -240,12 +239,9 @@ def _build_divisions(
     planet_list: List[PlanetInfo],
     d2_chart: List[List[str]],
     names: Dict[str, List[str]],
+    raw_planet_names: List[str],
 ) -> Dict[str, DivisionChartInfo]:
-    # Map raw pyjhora planet name (after clean_text) → planet_list index
-    raw_name_to_idx: Dict[str, int] = {}
-    for i in range(min(9, len(utils.PLANET_NAMES))):
-        raw, _ = ChartCleaner.split_name_symbol(utils.PLANET_NAMES[i])
-        raw_name_to_idx[ChartCleaner.clean_text(raw)] = i
+    raw_name_to_idx: Dict[str, int] = {name: i for i, name in enumerate(raw_planet_names)}
 
     # Per-division intermediate storage
     div_planet_data: Dict[str, Dict[int, tuple]] = {}  # div_code → {planet_idx: (sign_idx, long_in_sign)}
@@ -300,19 +296,18 @@ def _build_divisions(
             result[div_code] = DivisionChartInfo(planets=planets_out)
 
     # Override D2 with Traditional Parasara data
-    d2_lagna_sign = next(
-        (h for h, names_in_house in enumerate(d2_chart) if "Ascendant" in names_in_house),
-        None,
-    )
+    d2_name_to_house: Dict[str, int] = {
+        name: h
+        for h, names_in_house in enumerate(d2_chart)
+        for name in names_in_house
+    }
+    d2_lagna_sign = d2_name_to_house.get("Ascendant")
     if d2_lagna_sign is not None:
         d2_planets = []
         for planet_idx, p in enumerate(planet_list):
             raw_name, _ = ChartCleaner.split_name_symbol(utils.PLANET_NAMES[planet_idx])
             raw_cleaned = ChartCleaner.clean_text(raw_name)
-            house_idx = next(
-                (h for h, names_in_house in enumerate(d2_chart) if raw_cleaned in names_in_house),
-                None,
-            )
+            house_idx = d2_name_to_house.get(raw_cleaned)
             if house_idx is None:
                 continue
             long_in_sign = round((p.longitude_in_sign * 2) % 30, 4)
@@ -370,13 +365,14 @@ def build_horoscope_payload(data: HoroscopeRequest) -> Dict[str, object]:
     planet_list = _build_planet_list(jd_local, jd_utc, place, asc_sign_idx, names)
     house_signs = _compute_house_signs(asc_sign_idx)
 
+    raw_planet_names = [
+        ChartCleaner.clean_text(ChartCleaner.split_name_symbol(utils.PLANET_NAMES[i])[0])
+        for i in range(min(9, len(utils.PLANET_NAMES)))
+    ]
+
     # Attach Jaimini Karaka from D1 placements to each planet
-    raw_names = []
-    for i in range(min(9, len(utils.PLANET_NAMES))):
-        raw, _ = ChartCleaner.split_name_symbol(utils.PLANET_NAMES[i])
-        raw_names.append(ChartCleaner.clean_text(raw))
     for planet_info in planet_list:
-        key = f"Raasi-{raw_names[planet_info.id]}"
+        key = f"Raasi-{raw_planet_names[planet_info.id]}"
         value = cleaned["placements"].get(key)
         if value:
             planet_info.jaimini_karaka = parse_karaka_from_placement(value)
@@ -390,6 +386,7 @@ def build_horoscope_payload(data: HoroscopeRequest) -> Dict[str, object]:
         planet_list,
         cleaned["charts"]["D2"],
         names,
+        raw_planet_names,
     )
 
     return {

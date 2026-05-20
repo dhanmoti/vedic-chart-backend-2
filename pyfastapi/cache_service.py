@@ -90,7 +90,6 @@ class InMemoryTTLCache(BaseCacheBackend):
     def get(self, key: str) -> Optional[Dict[str, Any]]:
         now = time.time()
         with self._lock:
-            self._evict_expired(now)
             record = self._store.get(key)
             if record is None:
                 return None

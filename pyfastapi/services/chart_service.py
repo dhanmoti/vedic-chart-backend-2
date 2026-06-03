@@ -13,23 +13,31 @@ def parse_karaka_from_placement(placement_value: str) -> Optional[str]:
     return m.group(1) if m else None
 
 
-def parse_longitude_from_placement(placement_value: str) -> Optional[float]:
-    """Parse ecliptic longitude (degrees) from a zodiac placement string."""
+def parse_longitude_from_placement(
+    placement_value: str,
+    sign_to_index: Optional[Dict[str, int]] = None,
+) -> Optional[float]:
+    """Parse ecliptic longitude (degrees) from a zodiac placement string.
+
+    Accepts an optional sign_to_index map to support non-English sign names.
+    Longest sign names are matched first to avoid partial matches.
+    """
+    effective_map = {**_SIGN_TO_INDEX, **(sign_to_index or {})}
+    sorted_signs = sorted(effective_map, key=len, reverse=True)
+    sign_pat = "|".join(re.escape(s) for s in sorted_signs)
     match = re.search(
-        r"\b(Aries|Taurus|Gemini|Cancer|Leo|Virgo|Libra|Scorpio|Sagittarius|Capricorn|Aquarius|Pisces)"
-        r"\s+(\d{1,2})\s+(\d{1,2})(?:\s+(\d{1,2}))?",
+        rf"({sign_pat})\s+(\d{{1,2}})\D\s*(\d{{1,2}})(?:\D\s*(\d{{1,2}}))?",
         placement_value,
     )
     if not match:
         return None
 
     sign_name = match.group(1)
-    sign_index = _SIGN_TO_INDEX[sign_name]
+    sign_index = effective_map[sign_name]
     degrees = int(match.group(2))
     minutes = int(match.group(3))
     seconds = int(match.group(4) or 0)
-    sign_offset = degrees + (minutes / 60.0) + (seconds / 3600.0)
-    return sign_index * 30.0 + sign_offset
+    return sign_index * 30.0 + degrees + (minutes / 60.0) + (seconds / 3600.0)
 
 
 def extract_longitude_map(placements: Dict[str, str]) -> Dict[str, float]:
@@ -70,6 +78,7 @@ def extract_longitude_map(placements: Dict[str, str]) -> Dict[str, float]:
 
 def traditional_parasara_hora_from_rasi_positions(
     rasi_positions: List[List[object]],
+    planet_names: List[str],
 ) -> List[List[str]]:
     """Convert rasi positions to a D2 chart using Traditional Parasara mapping."""
     d2_houses = [[] for _ in range(12)]
@@ -85,9 +94,8 @@ def traditional_parasara_hora_from_rasi_positions(
         if planet == "L":
             planet_name = "Ascendant"
         else:
-            if not hasattr(utils, "PLANET_NAMES"):
-                utils.set_language("en")
-            planet_name = ChartCleaner.clean_text(utils.PLANET_NAMES[int(planet)])
+            idx = int(planet)
+            planet_name = planet_names[idx] if idx < len(planet_names) else f"Planet{idx}"
 
         d2_houses[hora_sign].append(planet_name)
 

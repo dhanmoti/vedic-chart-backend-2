@@ -10,7 +10,7 @@ def test_traditional_parasara_hora_maps_only_to_cancer_and_leo():
         [2, (1, 20.0)],    # even sign, second half => Leo (4)
     ]
 
-    d2_chart = traditional_parasara_hora_from_rasi_positions(rasi_positions)
+    d2_chart = traditional_parasara_hora_from_rasi_positions(rasi_positions, ["Sun", "Moon", "Mars"])
 
     non_empty_houses = {idx for idx, house in enumerate(d2_chart) if house}
     assert non_empty_houses == {3, 4}

@@ -62,10 +62,11 @@ class ChartCleaner:
 
     @staticmethod
     def format_response(raw_horoscope):
-        placements = {
-            ChartCleaner.clean_text(k): ChartCleaner.clean_text(v)
-            for k, v in raw_horoscope[0].items()
-        }
+        placements = {}
+        for raw_k, raw_v in raw_horoscope[0].items():
+            k = ChartCleaner.clean_unicode(raw_k).replace(_RETRO_SYMBOL, "").strip()
+            k, _ = ChartCleaner.split_name_symbol(k)
+            placements[k.strip()] = ChartCleaner.clean_unicode(raw_v).replace(_RETRO_SYMBOL, "").strip()
 
         chart_entries = raw_horoscope[1]
         expected_chart_count = len(const.division_chart_factors)

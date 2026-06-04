@@ -8,6 +8,19 @@ from fastapi.testclient import TestClient
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 
+@pytest.fixture(autouse=True)
+def reset_rate_limiter():
+    """Clear the in-memory rate-limit counters before every test.
+
+    slowapi's default MemoryStorage keeps counts in a module-level dict.
+    Without this reset, tests that fire many requests would trip the limiter
+    and cause unrelated tests to fail with 429.
+    """
+    from limiter import limiter
+    limiter._storage.reset()
+    yield
+
+
 @pytest.fixture
 def bypass_app_check():
     async def _bypass():

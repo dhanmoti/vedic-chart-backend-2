@@ -383,10 +383,18 @@ def build_horoscope_payload(data: HoroscopeRequest) -> Dict[str, object]:
     planet_list = _build_planet_list(jd_local, jd_utc, place, asc_sign_idx, names)
     house_signs = _compute_house_signs(asc_sign_idx)
 
-    # Attach Jaimini Karaka from D1 placements to each planet
+    # Attach Jaimini Karaka from D1 placements to each planet.
+    # The Raasi prefix is language-specific ("Raasi-" in English, "राशी-" in Hindi, etc.)
+    # so we index by the name suffix and exclude divisional-chart keys (prefix contains "(D").
+    planet_name_set = set(raw_planet_names)
+    d1_planet_values: Dict[str, str] = {}
+    for k, v in cleaned["placements"].items():
+        if "-" in k:
+            prefix, suffix = k.split("-", 1)
+            if suffix in planet_name_set and "(D" not in prefix:
+                d1_planet_values[suffix] = v
     for planet_info in planet_list:
-        key = f"Raasi-{raw_planet_names[planet_info.id]}"
-        value = cleaned["placements"].get(key)
+        value = d1_planet_values.get(raw_planet_names[planet_info.id])
         if value:
             planet_info.jaimini_karaka = parse_karaka_from_placement(value)
 

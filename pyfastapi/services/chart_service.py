@@ -8,8 +8,12 @@ from helpers import ChartCleaner
 
 
 def parse_karaka_from_placement(placement_value: str) -> Optional[str]:
-    """Extract Jaimini Karaka from placement string e.g. '... (Maitra Karaka)'."""
-    m = re.search(r"\(([^)]+Karaka)\)", placement_value)
+    """Extract Jaimini Karaka from placement string e.g. '... (Maitra Karaka)'.
+
+    Matches the trailing parenthetical regardless of language — pyjhora appends
+    the karaka label as the last parenthesized token in the value string.
+    """
+    m = re.search(r"\(([^)]+)\)\s*$", placement_value)
     return m.group(1) if m else None
 
 

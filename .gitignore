@@ -22,3 +22,4 @@ pyfastapi/__pycache__/
 pyfastapi/venv/
 pyfastapi/venv_stable/
 pyfastapi/CLAUDE.md
+pyfastapi/.coverage

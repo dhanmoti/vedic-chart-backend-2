@@ -10,7 +10,7 @@ from fastapi.concurrency import run_in_threadpool
 from cache_service import CacheConfig, HoroscopeCacheService
 from dependencies import verify_app_check
 from limiter import limiter
-from models import DashaResponse, HoroscopeRequest
+from models import DashaRequest, DashaResponse
 from services import dasha_service
 
 logger = logging.getLogger("uvicorn.error")
@@ -28,15 +28,17 @@ router = APIRouter()
 @router.post(
     "/dasha",
     response_model=DashaResponse,
-    summary="Vimshottari Mahadasha",
+    summary="Dasha Timeline",
     description=(
-        "Returns the Vimshottari dasha balance at birth and all 9 mahadashas, "
-        "each with 9 antardashas and 9 pratyantardashas."
+        "Returns a 3-level dasha hierarchy (mahadasha/antardasha/pratyantardasha) "
+        "for the requested `system` (vimshottari, ashtottari, yogini, kalachakra, "
+        "or chara). Defaults to vimshottari, which also includes the dasha balance "
+        "at birth; other systems return `balance: null`."
     ),
     dependencies=[Depends(verify_app_check)],
 )
 @limiter.limit(os.getenv("RATE_LIMIT_DEFAULT", "30/minute"))
-async def get_dasha(request: Request, data: HoroscopeRequest) -> DashaResponse:
+async def get_dasha(request: Request, data: DashaRequest) -> DashaResponse:
     compute_started = time.perf_counter()
     try:
         normalized_key_fields = CACHE_SERVICE.normalize_key_fields(
@@ -47,13 +49,19 @@ async def get_dasha(request: Request, data: HoroscopeRequest) -> DashaResponse:
             tz=data.tz,
             language=data.language,
         )
+        normalized_key_fields["system"] = data.system
         cache_key = CACHE_SERVICE.build_cache_key(normalized_key_fields)
         cached_payload = CACHE_SERVICE.get(cache_key)
         if cached_payload is not None:
             logger.info("dasha status=success source=cache")
             return cached_payload
 
-        payload = await run_in_threadpool(dasha_service.build_dasha_payload, data)
+        if data.system == "vimshottari":
+            payload = await run_in_threadpool(dasha_service.build_dasha_payload, data)
+        else:
+            payload = await run_in_threadpool(
+                dasha_service.build_generic_dasha_payload, data, data.system
+            )
         CACHE_SERVICE.set(cache_key, payload)
         logger.info(
             "dasha status=success source=generated duration_ms=%.2f",

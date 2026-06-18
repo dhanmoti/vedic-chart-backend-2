@@ -101,6 +101,18 @@ def _read_resource_messages_compat(message_file):
 
 jhora_utils._read_resource_messages_from_file = _read_resource_messages_compat
 
+# pyjhora 4.7.0+ changed its default ayanamsa from LAHIRI to TRUE_PUSHYA (to match
+# their desktop JHora software). Pin it back to LAHIRI so chart output stays
+# consistent with production and isn't silently re-shifted by a future pyjhora
+# release changing this default again.
+# Note: pyjhora 4.7.0+ also defaulted Rahu/Ketu to TRUE_NODE (was MEAN_NODE).
+# We do NOT pin that back: dhasavarga() (divisional charts) hardcodes
+# set_rahu_ketu_as_true_nodes=True as its own default and resets the global
+# planet_list mid-request regardless of our setting, so forcing MEAN_NODE
+# globally is not reliably achievable without patching multiple internal
+# pyjhora call sites. Rahu/Ketu longitudes intentionally use TRUE_NODE.
+drik.set_ayanamsa_mode('LAHIRI')
+
 # -------------------------------------------------------------------
 # Constants
 # -------------------------------------------------------------------

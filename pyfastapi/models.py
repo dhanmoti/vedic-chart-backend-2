@@ -156,13 +156,18 @@ class DashaBalance(BaseModel):
 
 
 class DashaData(BaseModel):
-    balance: DashaBalance
+    balance: Optional[DashaBalance] = None
     dashas: List[MahadashaEntry]
+    system: str = "vimshottari"
 
 
 class DashaResponse(BaseModel):
     status: str
     data: DashaData
+
+
+class DashaRequest(HoroscopeRequest):
+    system: Literal["vimshottari", "ashtottari", "yogini", "kalachakra", "chara"] = "vimshottari"
 
 
 class GocharRequest(BaseModel):

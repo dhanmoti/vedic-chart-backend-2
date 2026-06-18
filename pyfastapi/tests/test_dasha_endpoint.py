@@ -2,6 +2,7 @@ import re
 from datetime import date
 from unittest.mock import patch
 
+import pytest
 from fastapi.testclient import TestClient
 
 import routers.dasha as dasha_router
@@ -88,6 +89,7 @@ def test_dasha_cache_hit(app_client, valid_payload):
         "data": {
             "balance": {"years": 1, "months": 2, "days": 3},
             "dashas": [],
+            "system": "vimshottari",
         },
     }
 
@@ -130,3 +132,39 @@ def test_dasha_returns_500_on_service_failure(app_client, valid_payload):
 
     assert response.status_code == 500
     assert response.json()["detail"] == "Internal error generating dasha."
+
+
+@pytest.mark.parametrize("system", ["ashtottari", "yogini", "kalachakra", "chara"])
+def test_dasha_returns_expected_shape_for_each_system(app_client, valid_payload, system):
+    payload = {**valid_payload, "system": system}
+    response = app_client.post("/dasha", json=payload)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "success"
+    data = body["data"]
+    assert data["system"] == system
+    assert data["balance"] is None
+
+    dashas = data["dashas"]
+    assert len(dashas) > 0
+
+    iso_pattern = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+    ascii_pattern = re.compile(r"^[A-Za-z ]+$")
+    for maha in dashas:
+        assert ascii_pattern.match(maha["lord"]), f"bad lord: {maha['lord']}"
+        assert iso_pattern.match(maha["start_date"])
+        assert len(maha["antardashas"]) > 0
+        for antar in maha["antardashas"]:
+            assert ascii_pattern.match(antar["lord"]), f"bad lord: {antar['lord']}"
+            assert iso_pattern.match(antar["start_date"])
+            assert len(antar["pratyantardashas"]) > 0
+            for pratyantar in antar["pratyantardashas"]:
+                assert ascii_pattern.match(pratyantar["lord"]), f"bad lord: {pratyantar['lord']}"
+                assert iso_pattern.match(pratyantar["start_date"])
+
+
+def test_dasha_rejects_unknown_system(app_client, valid_payload):
+    payload = {**valid_payload, "system": "not_a_real_system"}
+    response = app_client.post("/dasha", json=payload)
+    assert response.status_code == 422

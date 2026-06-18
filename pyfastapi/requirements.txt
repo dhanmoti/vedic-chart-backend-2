@@ -7,6 +7,6 @@ timezonefinder==8.2.1
 geopy==2.4.1
 python-dateutil==2.9.0.post0
 pyswisseph==2.10.3.2
-pyjhora==4.6.0
+pyjhora==4.8.6
 firebase_admin==7.3.0
 slowapi==0.1.9

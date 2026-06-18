@@ -135,7 +135,7 @@ def build_dasha_payload(data: HoroscopeRequest) -> Dict:
         utils.set_language("en")
 
         vim_bal, _ = vimsottari.get_vimsottari_dhasa_bhukthi(
-            jd, place, include_antardhasa=False
+            jd, place, dhasa_level_index=3
         )
         mahadashas = vimsottari.vimsottari_mahadasa(jd, place)
 

@@ -44,42 +44,6 @@ def parse_longitude_from_placement(
     return sign_index * 30.0 + degrees + (minutes / 60.0) + (seconds / 3600.0)
 
 
-def extract_longitude_map(placements: Dict[str, str]) -> Dict[str, float]:
-    """Build a normalized longitude map from raw placement strings."""
-    aliases = {
-        "Raasi-Lagna": ["Raasi-Ascendant", "Raasi-Lagna"],
-        "Raasi-Sun": ["Raasi-Sun"],
-        "Raasi-Moon": ["Raasi-Moon"],
-        "Raasi-Mars": ["Raasi-Mars"],
-        "Raasi-Mercury": ["Raasi-Mercury"],
-        "Raasi-Jupiter": ["Raasi-Jupiter"],
-        "Raasi-Venus": ["Raasi-Venus"],
-        "Raasi-Saturn": ["Raasi-Saturn"],
-        "Raasi-Rahu": ["Raasi-Rahu", "Raasi-Raagu"],
-        "Raasi-Ketu": ["Raasi-Ketu", "Raasi-Kethu"],
-    }
-
-    longitude_map: Dict[str, float] = {}
-    for normalized_label, candidates in aliases.items():
-        for candidate in candidates:
-            placement_value = placements.get(candidate)
-            if not placement_value:
-                continue
-            longitude = parse_longitude_from_placement(placement_value)
-            if longitude is not None:
-                longitude_map[normalized_label] = longitude
-                break
-
-    rahu_longitude = longitude_map.get("Raasi-Rahu")
-    ketu_longitude = longitude_map.get("Raasi-Ketu")
-    if rahu_longitude is not None and ketu_longitude is None:
-        longitude_map["Raasi-Ketu"] = (rahu_longitude + 180.0) % 360.0
-    elif ketu_longitude is not None and rahu_longitude is None:
-        longitude_map["Raasi-Rahu"] = (ketu_longitude + 180.0) % 360.0
-
-    return longitude_map
-
-
 def traditional_parasara_hora_from_rasi_positions(
     rasi_positions: List[List[object]],
     planet_names: List[str],

@@ -330,3 +330,29 @@ class YogasData(BaseModel):
 class YogasResponse(BaseModel):
     status: str
     data: YogasData
+
+
+class BhavaArudhaEntry(BaseModel):
+    house: int
+    label: str
+    sign_index: int
+    sign: str
+    sign_symbol: str
+    longitude_in_sign: float
+
+
+class GrahaArudhaEntry(BaseModel):
+    planet: str
+    sign_index: int
+    sign: str
+    sign_symbol: str
+
+
+class ArudhaData(BaseModel):
+    bhava_arudhas: List[BhavaArudhaEntry]
+    graha_arudhas: List[GrahaArudhaEntry]
+
+
+class ArudhaResponse(BaseModel):
+    status: str
+    data: ArudhaData

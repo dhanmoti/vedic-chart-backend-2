@@ -13,6 +13,7 @@ from routers import transit as transit_router
 from routers import panchanga as panchanga_router
 from routers import ashtakavarga as ashtakavarga_router
 from routers import yogas as yogas_router
+from routers import arudha as arudha_router
 
 
 app = FastAPI()
@@ -27,3 +28,4 @@ app.include_router(transit_router.router)
 app.include_router(panchanga_router.router)
 app.include_router(ashtakavarga_router.router)
 app.include_router(yogas_router.router)
+app.include_router(arudha_router.router)

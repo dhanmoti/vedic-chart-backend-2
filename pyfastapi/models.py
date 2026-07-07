@@ -167,7 +167,19 @@ class DashaResponse(BaseModel):
 
 
 class DashaRequest(HoroscopeRequest):
-    system: Literal["vimshottari", "ashtottari", "yogini", "kalachakra", "chara"] = "vimshottari"
+    system: Literal[
+        "vimshottari",
+        "ashtottari",
+        "yogini",
+        "kalachakra",
+        "chara",
+        "lagna_kendradi_rasi",
+        "sudasa",
+        "narayana",
+        "drig",
+        "shoola",
+        "niryaana_shoola",
+    ] = "vimshottari"
 
 
 class GocharRequest(BaseModel):

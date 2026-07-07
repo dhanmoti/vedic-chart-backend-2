@@ -32,8 +32,9 @@ router = APIRouter()
     description=(
         "Returns a 3-level dasha hierarchy (mahadasha/antardasha/pratyantardasha) "
         "for the requested `system` (vimshottari, ashtottari, yogini, kalachakra, "
-        "or chara). Defaults to vimshottari, which also includes the dasha balance "
-        "at birth; other systems return `balance: null`."
+        "chara, lagna_kendradi_rasi, sudasa, narayana, drig, shoola, or "
+        "niryaana_shoola). Defaults to vimshottari, which also includes the dasha "
+        "balance at birth; other systems return `balance: null`."
     ),
     dependencies=[Depends(verify_app_check)],
 )

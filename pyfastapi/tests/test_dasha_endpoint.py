@@ -138,7 +138,21 @@ def test_dasha_returns_500_on_service_failure(app_client, valid_payload):
     assert response.json()["detail"] == "Internal error generating dasha."
 
 
-@pytest.mark.parametrize("system", ["ashtottari", "yogini", "kalachakra", "chara"])
+@pytest.mark.parametrize(
+    "system",
+    [
+        "ashtottari",
+        "yogini",
+        "kalachakra",
+        "chara",
+        "lagna_kendradi_rasi",
+        "sudasa",
+        "narayana",
+        "drig",
+        "shoola",
+        "niryaana_shoola",
+    ],
+)
 def test_dasha_returns_expected_shape_for_each_system(app_client, valid_payload, system):
     payload = {**valid_payload, "system": system}
     response = app_client.post("/dasha", json=payload)
@@ -176,7 +190,7 @@ def test_dasha_rejects_unknown_system(app_client, valid_payload):
 
 def test_dasha_benchmark_outputs_match_fixture_for_all_systems(app_client):
     cases = json.loads(FIXTURE_PATH.read_text())
-    assert len(cases) == 10
+    assert len(cases) == 22
 
     for case in cases:
         response = app_client.post("/dasha", json=case["input"])

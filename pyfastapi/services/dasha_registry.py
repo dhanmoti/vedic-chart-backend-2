@@ -2,6 +2,8 @@ import importlib
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict
 
+from jhora import const
+
 
 @dataclass(frozen=True)
 class DashaSystemSpec:
@@ -74,6 +76,9 @@ DASHA_SYSTEMS: Dict[str, DashaSystemSpec] = {
         function_name="get_dhasa_antardhasa",
         input_kind="jd",
         lord_kind="rasi",
+        # Pin explicitly rather than relying on pyjhora's const.DRIG_TYPE_DEFAULT,
+        # so a future pyjhora release can't silently change dasha output for this system.
+        extra_kwargs={"dhasa_method": const.DRIG_TYPE.PVR_PAPER},
     ),
     "shoola": DashaSystemSpec(
         name="shoola",

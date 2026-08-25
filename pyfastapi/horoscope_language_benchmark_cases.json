@@ -47,7 +47,7 @@
             "longitude": 206.6557,
             "longitude_in_sign": 26.6557,
             "is_retrograde": false,
-            "daily_motion": 1.006,
+            "daily_motion": 1.0063,
             "dignity": {
               "status": "debilitated",
               "score": 0,
@@ -74,7 +74,7 @@
             "longitude": 282.5904,
             "longitude_in_sign": 12.5904,
             "is_retrograde": false,
-            "daily_motion": 11.809,
+            "daily_motion": 11.809279,
             "dignity": {
               "status": "neutral",
               "score": 2,
@@ -101,7 +101,7 @@
             "longitude": 205.1407,
             "longitude_in_sign": 25.1407,
             "is_retrograde": false,
-            "daily_motion": 0.697,
+            "daily_motion": 0.697458,
             "dignity": {
               "status": "neutral",
               "score": 2,
@@ -128,7 +128,7 @@
             "longitude": 228.1114,
             "longitude_in_sign": 18.1114,
             "is_retrograde": false,
-            "daily_motion": 1.246,
+            "daily_motion": 1.246368,
             "dignity": {
               "status": "neutral",
               "score": 2,
@@ -155,7 +155,7 @@
             "longitude": 137.5004,
             "longitude_in_sign": 17.5004,
             "is_retrograde": false,
-            "daily_motion": 0.133,
+            "daily_motion": 0.13295,
             "dignity": {
               "status": "friend",
               "score": 3,
@@ -182,7 +182,7 @@
             "longitude": 160.5091,
             "longitude_in_sign": 10.5091,
             "is_retrograde": false,
-            "daily_motion": 1.07,
+            "daily_motion": 1.069615,
             "dignity": {
               "status": "debilitated",
               "score": 0,
@@ -209,7 +209,7 @@
             "longitude": 277.7062,
             "longitude_in_sign": 7.7062,
             "is_retrograde": false,
-            "daily_motion": 0.063,
+            "daily_motion": 0.062505,
             "dignity": {
               "status": "own_sign",
               "score": 5,
@@ -236,7 +236,7 @@
             "longitude": 257.3109,
             "longitude_in_sign": 17.3109,
             "is_retrograde": true,
-            "daily_motion": 0.02,
+            "daily_motion": 0.02037,
             "dignity": {
               "status": "debilitated",
               "score": 0,
@@ -263,7 +263,7 @@
             "longitude": 77.3109,
             "longitude_in_sign": 17.3109,
             "is_retrograde": true,
-            "daily_motion": 0.02,
+            "daily_motion": 0.02037,
             "dignity": {
               "status": "debilitated",
               "score": 0,
@@ -3311,7 +3311,7 @@
             "longitude": 336.7322,
             "longitude_in_sign": 6.7322,
             "is_retrograde": false,
-            "daily_motion": 0.993,
+            "daily_motion": 0.993397,
             "dignity": {
               "status": "friend",
               "score": 3,
@@ -3338,7 +3338,7 @@
             "longitude": 331.8218,
             "longitude_in_sign": 1.8218,
             "is_retrograde": false,
-            "daily_motion": 11.99,
+            "daily_motion": 11.990296,
             "dignity": {
               "status": "neutral",
               "score": 2,
@@ -3365,7 +3365,7 @@
             "longitude": 10.5955,
             "longitude_in_sign": 10.5955,
             "is_retrograde": false,
-            "daily_motion": 0.723,
+            "daily_motion": 0.722882,
             "dignity": {
               "status": "moolatrikona",
               "score": 5,
@@ -3392,7 +3392,7 @@
             "longitude": 354.0932,
             "longitude_in_sign": 24.0932,
             "is_retrograde": false,
-            "daily_motion": 0.494,
+            "daily_motion": 0.494013,
             "dignity": {
               "status": "debilitated",
               "score": 0,
@@ -3419,7 +3419,7 @@
             "longitude": 285.3456,
             "longitude_in_sign": 15.3456,
             "is_retrograde": false,
-            "daily_motion": 0.187,
+            "daily_motion": 0.187406,
             "dignity": {
               "status": "debilitated",
               "score": 0,
@@ -3446,7 +3446,7 @@
             "longitude": 357.5581,
             "longitude_in_sign": 27.5581,
             "is_retrograde": true,
-            "daily_motion": 0.299,
+            "daily_motion": 0.298925,
             "dignity": {
               "status": "exalted",
               "score": 4,
@@ -3473,7 +3473,7 @@
             "longitude": 214.3243,
             "longitude_in_sign": 4.3243,
             "is_retrograde": true,
-            "daily_motion": 0.023,
+            "daily_motion": 0.022687,
             "dignity": {
               "status": "enemy",
               "score": 1,
@@ -3500,7 +3500,7 @@
             "longitude": 25.5324,
             "longitude_in_sign": 25.5324,
             "is_retrograde": true,
-            "daily_motion": 0.149,
+            "daily_motion": 0.14938,
             "dignity": {
               "status": "enemy",
               "score": 1,
@@ -3527,7 +3527,7 @@
             "longitude": 205.5324,
             "longitude_in_sign": 25.5324,
             "is_retrograde": true,
-            "daily_motion": 0.149,
+            "daily_motion": 0.14938,
             "dignity": {
               "status": "friend",
               "score": 3,
@@ -6580,7 +6580,7 @@
             "longitude": 79.1496,
             "longitude_in_sign": 19.1496,
             "is_retrograde": false,
-            "daily_motion": 0.954,
+            "daily_motion": 0.95364,
             "dignity": {
               "status": "neutral",
               "score": 2,
@@ -6607,7 +6607,7 @@
             "longitude": 119.8985,
             "longitude_in_sign": 29.8985,
             "is_retrograde": false,
-            "daily_motion": 14.604,
+            "daily_motion": 14.60398,
             "dignity": {
               "status": "own_sign",
               "score": 5,
@@ -6634,7 +6634,7 @@
             "longitude": 78.2641,
             "longitude_in_sign": 18.2641,
             "is_retrograde": false,
-            "daily_motion": 0.661,
+            "daily_motion": 0.660953,
             "dignity": {
               "status": "enemy",
               "score": 1,
@@ -6661,7 +6661,7 @@
             "longitude": 81.9339,
             "longitude_in_sign": 21.9339,
             "is_retrograde": true,
-            "daily_motion": 0.614,
+            "daily_motion": 0.614226,
             "dignity": {
               "status": "own_sign",
               "score": 5,
@@ -6688,7 +6688,7 @@
             "longitude": 37.0538,
             "longitude_in_sign": 7.0538,
             "is_retrograde": false,
-            "daily_motion": 0.204,
+            "daily_motion": 0.203796,
             "dignity": {
               "status": "enemy",
               "score": 1,
@@ -6715,7 +6715,7 @@
             "longitude": 85.547,
             "longitude_in_sign": 25.547,
             "is_retrograde": false,
-            "daily_motion": 1.229,
+            "daily_motion": 1.229339,
             "dignity": {
               "status": "friend",
               "score": 3,
@@ -6742,7 +6742,7 @@
             "longitude": 33.1753,
             "longitude_in_sign": 3.1753,
             "is_retrograde": false,
-            "daily_motion": 0.103,
+            "daily_motion": 0.102529,
             "dignity": {
               "status": "friend",
               "score": 3,
@@ -6769,7 +6769,7 @@
             "longitude": 90.7645,
             "longitude_in_sign": 0.7645,
             "is_retrograde": true,
-            "daily_motion": 0.014,
+            "daily_motion": 0.014117,
             "dignity": {
               "status": "enemy",
               "score": 1,
@@ -6796,7 +6796,7 @@
             "longitude": 270.7645,
             "longitude_in_sign": 0.7645,
             "is_retrograde": true,
-            "daily_motion": 0.014,
+            "daily_motion": 0.014117,
             "dignity": {
               "status": "friend",
               "score": 3,
@@ -9848,7 +9848,7 @@
             "longitude": 249.6304,
             "longitude_in_sign": 9.6304,
             "is_retrograde": false,
-            "daily_motion": 1.019,
+            "daily_motion": 1.018792,
             "dignity": {
               "status": "friend",
               "score": 3,
@@ -9875,7 +9875,7 @@
             "longitude": 159.1432,
             "longitude_in_sign": 9.1432,
             "is_retrograde": false,
-            "daily_motion": 14.135,
+            "daily_motion": 14.135186,
             "dignity": {
               "status": "friend",
               "score": 3,
@@ -9902,7 +9902,7 @@
             "longitude": 55.7734,
             "longitude_in_sign": 25.7734,
             "is_retrograde": true,
-            "daily_motion": 0.333,
+            "daily_motion": 0.333048,
             "dignity": {
               "status": "neutral",
               "score": 2,
@@ -9929,7 +9929,7 @@
             "longitude": 264.3581,
             "longitude_in_sign": 24.3581,
             "is_retrograde": false,
-            "daily_motion": 1.544,
+            "daily_motion": 1.543555,
             "dignity": {
               "status": "neutral",
               "score": 2,
@@ -9956,7 +9956,7 @@
             "longitude": 351.6136,
             "longitude_in_sign": 21.6136,
             "is_retrograde": false,
-            "daily_motion": 0.051,
+            "daily_motion": 0.051429,
             "dignity": {
               "status": "own_sign",
               "score": 5,
@@ -9983,7 +9983,7 @@
             "longitude": 208.2039,
             "longitude_in_sign": 28.2039,
             "is_retrograde": false,
-            "daily_motion": 1.19,
+            "daily_motion": 1.189522,
             "dignity": {
               "status": "own_sign",
               "score": 5,
@@ -10010,7 +10010,7 @@
             "longitude": 97.9828,
             "longitude_in_sign": 7.9828,
             "is_retrograde": true,
-            "daily_motion": 0.067,
+            "daily_motion": 0.066983,
             "dignity": {
               "status": "enemy",
               "score": 1,
@@ -10037,7 +10037,7 @@
             "longitude": 207.4387,
             "longitude_in_sign": 27.4387,
             "is_retrograde": true,
-            "daily_motion": 0.001,
+            "daily_motion": 0.001056,
             "dignity": {
               "status": "friend",
               "score": 3,
@@ -10064,7 +10064,7 @@
             "longitude": 27.4387,
             "longitude_in_sign": 27.4387,
             "is_retrograde": true,
-            "daily_motion": 0.001,
+            "daily_motion": 0.001056,
             "dignity": {
               "status": "enemy",
               "score": 1,
@@ -13119,7 +13119,7 @@
             "longitude": 206.6557,
             "longitude_in_sign": 26.6557,
             "is_retrograde": false,
-            "daily_motion": 1.006,
+            "daily_motion": 1.0063,
             "dignity": {
               "status": "debilitated",
               "score": 0,
@@ -13146,7 +13146,7 @@
             "longitude": 282.5904,
             "longitude_in_sign": 12.5904,
             "is_retrograde": false,
-            "daily_motion": 11.809,
+            "daily_motion": 11.809279,
             "dignity": {
               "status": "neutral",
               "score": 2,
@@ -13173,7 +13173,7 @@
             "longitude": 205.1407,
             "longitude_in_sign": 25.1407,
             "is_retrograde": false,
-            "daily_motion": 0.697,
+            "daily_motion": 0.697458,
             "dignity": {
               "status": "neutral",
               "score": 2,
@@ -13200,7 +13200,7 @@
             "longitude": 228.1114,
             "longitude_in_sign": 18.1114,
             "is_retrograde": false,
-            "daily_motion": 1.246,
+            "daily_motion": 1.246368,
             "dignity": {
               "status": "neutral",
               "score": 2,
@@ -13227,7 +13227,7 @@
             "longitude": 137.5004,
             "longitude_in_sign": 17.5004,
             "is_retrograde": false,
-            "daily_motion": 0.133,
+            "daily_motion": 0.13295,
             "dignity": {
               "status": "friend",
               "score": 3,
@@ -13254,7 +13254,7 @@
             "longitude": 160.5091,
             "longitude_in_sign": 10.5091,
             "is_retrograde": false,
-            "daily_motion": 1.07,
+            "daily_motion": 1.069615,
             "dignity": {
               "status": "debilitated",
               "score": 0,
@@ -13281,7 +13281,7 @@
             "longitude": 277.7062,
             "longitude_in_sign": 7.7062,
             "is_retrograde": false,
-            "daily_motion": 0.063,
+            "daily_motion": 0.062505,
             "dignity": {
               "status": "own_sign",
               "score": 5,
@@ -13308,7 +13308,7 @@
             "longitude": 257.3109,
             "longitude_in_sign": 17.3109,
             "is_retrograde": true,
-            "daily_motion": 0.02,
+            "daily_motion": 0.02037,
             "dignity": {
               "status": "debilitated",
               "score": 0,
@@ -13335,7 +13335,7 @@
             "longitude": 77.3109,
             "longitude_in_sign": 17.3109,
             "is_retrograde": true,
-            "daily_motion": 0.02,
+            "daily_motion": 0.02037,
             "dignity": {
               "status": "debilitated",
               "score": 0,
@@ -16383,7 +16383,7 @@
             "longitude": 336.7322,
             "longitude_in_sign": 6.7322,
             "is_retrograde": false,
-            "daily_motion": 0.993,
+            "daily_motion": 0.993397,
             "dignity": {
               "status": "friend",
               "score": 3,
@@ -16410,7 +16410,7 @@
             "longitude": 331.8218,
             "longitude_in_sign": 1.8218,
             "is_retrograde": false,
-            "daily_motion": 11.99,
+            "daily_motion": 11.990296,
             "dignity": {
               "status": "neutral",
               "score": 2,
@@ -16437,7 +16437,7 @@
             "longitude": 10.5955,
             "longitude_in_sign": 10.5955,
             "is_retrograde": false,
-            "daily_motion": 0.723,
+            "daily_motion": 0.722882,
             "dignity": {
               "status": "moolatrikona",
               "score": 5,
@@ -16464,7 +16464,7 @@
             "longitude": 354.0932,
             "longitude_in_sign": 24.0932,
             "is_retrograde": false,
-            "daily_motion": 0.494,
+            "daily_motion": 0.494013,
             "dignity": {
               "status": "debilitated",
               "score": 0,
@@ -16491,7 +16491,7 @@
             "longitude": 285.3456,
             "longitude_in_sign": 15.3456,
             "is_retrograde": false,
-            "daily_motion": 0.187,
+            "daily_motion": 0.187406,
             "dignity": {
               "status": "debilitated",
               "score": 0,
@@ -16518,7 +16518,7 @@
             "longitude": 357.5581,
             "longitude_in_sign": 27.5581,
             "is_retrograde": true,
-            "daily_motion": 0.299,
+            "daily_motion": 0.298925,
             "dignity": {
               "status": "exalted",
               "score": 4,
@@ -16545,7 +16545,7 @@
             "longitude": 214.3243,
             "longitude_in_sign": 4.3243,
             "is_retrograde": true,
-            "daily_motion": 0.023,
+            "daily_motion": 0.022687,
             "dignity": {
               "status": "enemy",
               "score": 1,
@@ -16572,7 +16572,7 @@
             "longitude": 25.5324,
             "longitude_in_sign": 25.5324,
             "is_retrograde": true,
-            "daily_motion": 0.149,
+            "daily_motion": 0.14938,
             "dignity": {
               "status": "enemy",
               "score": 1,
@@ -16599,7 +16599,7 @@
             "longitude": 205.5324,
             "longitude_in_sign": 25.5324,
             "is_retrograde": true,
-            "daily_motion": 0.149,
+            "daily_motion": 0.14938,
             "dignity": {
               "status": "friend",
               "score": 3,
@@ -19652,7 +19652,7 @@
             "longitude": 79.1496,
             "longitude_in_sign": 19.1496,
             "is_retrograde": false,
-            "daily_motion": 0.954,
+            "daily_motion": 0.95364,
             "dignity": {
               "status": "neutral",
               "score": 2,
@@ -19679,7 +19679,7 @@
             "longitude": 119.8985,
             "longitude_in_sign": 29.8985,
             "is_retrograde": false,
-            "daily_motion": 14.604,
+            "daily_motion": 14.60398,
             "dignity": {
               "status": "own_sign",
               "score": 5,
@@ -19706,7 +19706,7 @@
             "longitude": 78.2641,
             "longitude_in_sign": 18.2641,
             "is_retrograde": false,
-            "daily_motion": 0.661,
+            "daily_motion": 0.660953,
             "dignity": {
               "status": "enemy",
               "score": 1,
@@ -19733,7 +19733,7 @@
             "longitude": 81.9339,
             "longitude_in_sign": 21.9339,
             "is_retrograde": true,
-            "daily_motion": 0.614,
+            "daily_motion": 0.614226,
             "dignity": {
               "status": "own_sign",
               "score": 5,
@@ -19760,7 +19760,7 @@
             "longitude": 37.0538,
             "longitude_in_sign": 7.0538,
             "is_retrograde": false,
-            "daily_motion": 0.204,
+            "daily_motion": 0.203796,
             "dignity": {
               "status": "enemy",
               "score": 1,
@@ -19787,7 +19787,7 @@
             "longitude": 85.547,
             "longitude_in_sign": 25.547,
             "is_retrograde": false,
-            "daily_motion": 1.229,
+            "daily_motion": 1.229339,
             "dignity": {
               "status": "friend",
               "score": 3,
@@ -19814,7 +19814,7 @@
             "longitude": 33.1753,
             "longitude_in_sign": 3.1753,
             "is_retrograde": false,
-            "daily_motion": 0.103,
+            "daily_motion": 0.102529,
             "dignity": {
               "status": "friend",
               "score": 3,
@@ -19841,7 +19841,7 @@
             "longitude": 90.7645,
             "longitude_in_sign": 0.7645,
             "is_retrograde": true,
-            "daily_motion": 0.014,
+            "daily_motion": 0.014117,
             "dignity": {
               "status": "enemy",
               "score": 1,
@@ -19868,7 +19868,7 @@
             "longitude": 270.7645,
             "longitude_in_sign": 0.7645,
             "is_retrograde": true,
-            "daily_motion": 0.014,
+            "daily_motion": 0.014117,
             "dignity": {
               "status": "friend",
               "score": 3,
@@ -22920,7 +22920,7 @@
             "longitude": 249.6304,
             "longitude_in_sign": 9.6304,
             "is_retrograde": false,
-            "daily_motion": 1.019,
+            "daily_motion": 1.018792,
             "dignity": {
               "status": "friend",
               "score": 3,
@@ -22947,7 +22947,7 @@
             "longitude": 159.1432,
             "longitude_in_sign": 9.1432,
             "is_retrograde": false,
-            "daily_motion": 14.135,
+            "daily_motion": 14.135186,
             "dignity": {
               "status": "friend",
               "score": 3,
@@ -22974,7 +22974,7 @@
             "longitude": 55.7734,
             "longitude_in_sign": 25.7734,
             "is_retrograde": true,
-            "daily_motion": 0.333,
+            "daily_motion": 0.333048,
             "dignity": {
               "status": "neutral",
               "score": 2,
@@ -23001,7 +23001,7 @@
             "longitude": 264.3581,
             "longitude_in_sign": 24.3581,
             "is_retrograde": false,
-            "daily_motion": 1.544,
+            "daily_motion": 1.543555,
             "dignity": {
               "status": "neutral",
               "score": 2,
@@ -23028,7 +23028,7 @@
             "longitude": 351.6136,
             "longitude_in_sign": 21.6136,
             "is_retrograde": false,
-            "daily_motion": 0.051,
+            "daily_motion": 0.051429,
             "dignity": {
               "status": "own_sign",
               "score": 5,
@@ -23055,7 +23055,7 @@
             "longitude": 208.2039,
             "longitude_in_sign": 28.2039,
             "is_retrograde": false,
-            "daily_motion": 1.19,
+            "daily_motion": 1.189522,
             "dignity": {
               "status": "own_sign",
               "score": 5,
@@ -23082,7 +23082,7 @@
             "longitude": 97.9828,
             "longitude_in_sign": 7.9828,
             "is_retrograde": true,
-            "daily_motion": 0.067,
+            "daily_motion": 0.066983,
             "dignity": {
               "status": "enemy",
               "score": 1,
@@ -23109,7 +23109,7 @@
             "longitude": 207.4387,
             "longitude_in_sign": 27.4387,
             "is_retrograde": true,
-            "daily_motion": 0.001,
+            "daily_motion": 0.001056,
             "dignity": {
               "status": "friend",
               "score": 3,
@@ -23136,7 +23136,7 @@
             "longitude": 27.4387,
             "longitude_in_sign": 27.4387,
             "is_retrograde": true,
-            "daily_motion": 0.001,
+            "daily_motion": 0.001056,
             "dignity": {
               "status": "enemy",
               "score": 1,

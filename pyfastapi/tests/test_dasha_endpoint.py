@@ -129,7 +129,7 @@ def test_dasha_returns_500_on_service_failure(app_client, valid_payload):
     with patch.object(dasha_router.CACHE_SERVICE, "get", return_value=None), \
          patch.object(
              dasha_service.vimsottari,
-             "vimsottari_mahadasa",
+             "get_dhasa_antardhasa",
              side_effect=RuntimeError("boom"),
          ):
         response = app_client.post("/dasha", json=valid_payload)

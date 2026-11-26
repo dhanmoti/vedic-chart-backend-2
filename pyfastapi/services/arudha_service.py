@@ -57,7 +57,7 @@ def build_arudha_payload(data: HoroscopeRequest) -> Dict:
             "sign": sign_names[int(sign_idx)],
             "sign_symbol": const._zodiac_symbols[int(sign_idx)],
         }
-        for label, sign_idx in zip(_GRAHA_LABELS, graha_arudhas)
+        for label, (sign_idx, _longitude) in zip(_GRAHA_LABELS, graha_arudhas)
     ]
 
     return {

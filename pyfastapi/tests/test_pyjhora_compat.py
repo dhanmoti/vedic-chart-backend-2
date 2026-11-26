@@ -7,8 +7,9 @@ planets, yogas), so warnings are treated as failures too.
 import logging
 
 import pytest
+from jhora import const
 
-import config  # noqa: F401  ensures pyjhora compatibility shims are applied
+import config  # noqa: F401  ensures pyjhora settings are pinned
 from models import DashaRequest, GocharRequest, HoroscopeRequest, PanchangaRequest, VarshaRequest
 from services import (
     arudha_service,
@@ -65,3 +66,27 @@ def test_every_dasha_system_survives():
     for system in DASHA_SYSTEMS:
         payload = dasha_service.build_generic_dasha_payload(DashaRequest(**BIRTH, system=system), system)
         assert payload["data"]["dashas"], system
+
+
+def test_calculation_settings_are_pinned():
+    """pyjhora releases have changed these defaults before, silently shifting results."""
+    assert const._DEFAULT_AYANAMSA_MODE == "LAHIRI"
+    assert const.dhasa_year_duration_default == const.DHASA_YEAR_DURATION.MEAN_SIDEREAL_YEAR
+    assert const.varga_option_dict[2] == (6, 2)
+    assert DASHA_SYSTEMS["kalachakra"].extra_kwargs["dhasa_method"] == const.KALACHAKRA_TYPE.PVR_SANJAY_RATH
+    assert DASHA_SYSTEMS["drig"].extra_kwargs["dhasa_method"] == const.DRIG_TYPE.PVR_PAPER
+
+
+def test_divisional_karakas_rank_planets_by_their_position_in_that_chart():
+    """Atma Karaka is the graha furthest advanced in its sign (Rahu counted backwards)."""
+    divisions = horoscope_service.build_horoscope_payload(HoroscopeRequest(**BIRTH))["data"]["divisions"]
+
+    for code, division in divisions.items():
+        if code == "D2":
+            continue
+        advancement = {
+            p.id: 30 - p.longitude_in_sign if p.id == 7 else p.longitude_in_sign
+            for p in division.planets[:8]
+        }
+        atma = max(advancement, key=advancement.get)
+        assert division.planets[atma].jaimini_karaka == "Atma Karaka", code

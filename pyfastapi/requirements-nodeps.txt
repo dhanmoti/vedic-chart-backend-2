@@ -1,0 +1,4 @@
+# Installed with `pip install --no-deps`. PyJHora 5.0.6 declares exact pins for its
+# desktop UI (PyQt6, older numpy/pytz/timezonefinder) that conflict with ours.
+# Its runtime imports are covered by requirements.txt.
+pyjhora==5.0.6

@@ -63,7 +63,7 @@ def build_panchanga_payload(data: PanchangaRequest) -> Dict:
         nak_result = drik.nakshatra(jd, place)
         yoga_result = drik.yogam(jd, place)
         karana_result = drik.karana(jd, place)
-        vaara_result = drik.vaara(jd)
+        vaara_result = drik.civil_weekday(jd)
         lunar_month_result = drik.lunar_month(jd, place)
         sunrise_result = drik.sunrise(jd, place)
         sunset_result = drik.sunset(jd, place)

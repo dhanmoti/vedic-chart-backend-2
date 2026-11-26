@@ -128,7 +128,7 @@ def test_horoscope_rejects_invalid_chart_style(app_client, valid_payload):
 
 
 def test_horoscope_returns_500_on_chart_generation_failure(app_client, valid_payload):
-    with patch.object(horoscope_service, "Horoscope", side_effect=RuntimeError("boom")):
+    with patch.object(horoscope_service.charts, "divisional_chart", side_effect=RuntimeError("boom")):
         response = app_client.post("/horoscope", json=valid_payload)
 
     assert response.status_code == 500
@@ -233,7 +233,7 @@ def test_horoscope_north_style_uses_sanskrit_nakshatra_names(app_client, valid_p
     )
 
 
-def test_horoscope_south_style_preserves_tamil_rahu_ketu(app_client, valid_payload):
+def test_horoscope_south_style_uses_pyjhora_rahu_ketu_names(app_client, valid_payload):
     payload = {**valid_payload, "chart_style": "south", "language": "en"}
     response = app_client.post("/horoscope", json=payload)
     assert response.status_code == 200
@@ -241,5 +241,5 @@ def test_horoscope_south_style_preserves_tamil_rahu_ketu(app_client, valid_paylo
     planets = response.json()["data"]["planets"]
     rahu = planets[7]
     ketu = planets[8]
-    assert rahu["name"] == "Raagu", f"Expected 'Raagu', got '{rahu['name']}'"
-    assert ketu["name"] == "Kethu", f"Expected 'Kethu', got '{ketu['name']}'"
+    assert rahu["name"] == "Rahu", f"Expected 'Rahu', got '{rahu['name']}'"
+    assert ketu["name"] == "Ketu", f"Expected 'Ketu', got '{ketu['name']}'"

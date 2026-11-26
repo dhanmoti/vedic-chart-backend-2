@@ -51,3 +51,9 @@ def valid_payload():
         "language": "en",
         "chart_style": "south",
     }
+
+
+@pytest.fixture(autouse=True)
+def _disable_tz_auto_correct(monkeypatch):
+    # Benchmark fixtures pin pyjhora output for the exact tz sent; tz inference is covered in test_tz_id.py
+    monkeypatch.setenv("TZ_AUTO_CORRECT", "false")

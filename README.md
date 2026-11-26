@@ -32,7 +32,8 @@ Generates a full Vedic horoscope: per-planet data (sign, house, longitude, digni
 | `time` | string | yes | — | 24-hour `HH:MM`, 00:00–23:59 |
 | `lat` | float | yes | — | −90 to 90 |
 | `lng` | float | yes | — | −180 to 180 |
-| `tz` | float | yes | — | UTC offset, −14 to 14 |
+| `tz` | float | yes, unless `tz_id` | — | UTC offset in hours at birth (incl. DST/historical), −14 to 14 |
+| `tz_id` | string | no | — | IANA zone, e.g. `Asia/Kolkata`. Overrides `tz`; offset is resolved for the birth date/time (DST & history aware). Unknown IDs → 422. If `tz_id` is omitted, the zone is inferred from `lat`/`lng` and a `tz` equal to the zone's present-day offset (but not the offset at birth) is corrected automatically; set `TZ_AUTO_CORRECT=false` to disable. Resolved `tz_id`/`tz_offset` are echoed in `meta` (`/horoscope`). Applies to every endpoint that takes `tz` |
 | `language` | string | no | `"en"` | `en`, `hi`, `ta`, `te`, `ka`, `ml` |
 | `chart_style` | string | no | `"south"` | `"south"` or `"north"` |
 
@@ -246,6 +247,7 @@ CACHE_TTL_SECONDS=900
 CACHE_MAX_ENTRIES=1024
 CACHE_LAT_LNG_PRECISION=2
 CACHE_TZ_PRECISION=2
+TZ_AUTO_CORRECT=true
 CACHE_KEY_PREFIX=horoscope:v1
 DASHA_CACHE_KEY_PREFIX=dasha:v1
 ```

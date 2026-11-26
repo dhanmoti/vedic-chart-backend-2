@@ -70,10 +70,12 @@ def build_gochar_payload(data: GocharRequest) -> Dict:
     t_hour, t_minute = [int(p) for p in data.transit_time.split(":")]
     transit_date = drik.Date(t_year, t_month, t_day)
     transit_jd_local = utils.julian_day_number(transit_date, (t_hour, t_minute, 0))
-    transit_jd_utc = transit_jd_local - (data.tz / 24.0)
+    transit_jd_utc = transit_jd_local - (data.transit_tz / 24.0)
+
+    transit_place = drik.Place("", data.lat, data.lng, data.transit_tz)
 
     with suppress_third_party_stdout():
-        retro_set = set(drik.planets_in_retrograde(transit_jd_local, place))
+        retro_set = set(drik.planets_in_retrograde(transit_jd_local, transit_place))
 
     names = _load_names(data.language, data.chart_style)
 

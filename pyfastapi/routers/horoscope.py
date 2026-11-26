@@ -105,6 +105,8 @@ async def get_horoscope(
             language=data.language,
         )
         normalized_key_fields["chart_style"] = data.chart_style
+        # tz_id is echoed in the response meta, so it must not share an entry with a plain tz request
+        normalized_key_fields["tz_id"] = data.tz_id
         cache_key = CACHE_SERVICE.build_cache_key(normalized_key_fields)
         cached_payload = CACHE_SERVICE.get(cache_key)
         if cached_payload is not None:

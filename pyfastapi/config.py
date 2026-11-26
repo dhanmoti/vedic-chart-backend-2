@@ -116,6 +116,9 @@ drik.set_ayanamsa_mode('LAHIRI')
 # -------------------------------------------------------------------
 # Constants
 # -------------------------------------------------------------------
+# Languages the API offers. PyJHora ships more, but only these have been verified.
+SUPPORTED_LANGUAGES = ("en", "hi", "ta", "te", "ka", "ml")
+
 _SIGN_TO_INDEX = {
     "Aries": 0,
     "Taurus": 1,

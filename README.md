@@ -10,7 +10,7 @@ This project uses the Swiss Ephemeris under the Swiss Ephemeris Free License and
 
 ### `POST /horoscope`
 
-Generates a full Vedic horoscope: per-planet data (sign, house, longitude, dignity, retrograde, nakshatra, symbol, color), ascendant details, D1–D60 divisional charts, and a house-to-sign mapping for rendering.
+Generates a full Vedic horoscope: per-planet data (sign, house, longitude, dignity, retrograde, nakshatra, symbol, color), ascendant details, D1–D150 divisional charts, and a house-to-sign mapping for rendering.
 
 #### Request body
 
@@ -39,12 +39,10 @@ Generates a full Vedic horoscope: per-planet data (sign, house, longitude, digni
 
 ##### `chart_style` and naming
 
-| `chart_style` | `language` | Planet names | Sign names | Nakshatra names |
-|---|---|---|---|---|
-| `south` | `en` | Tamil-English ("Raagu", "Kethu") | Western English | Tamil-style ("Aswini", "Karthigai") |
-| `north` | `en` | Western English + fixed ("Rahu", "Ketu") | Western English | Sanskrit ("Ashvini", "Krittika") |
-| any | `hi` | Hindi Devanagari | Hindi Devanagari | Hindi Devanagari |
-| any | `ta` | Tamil script | Tamil script | Tamil script |
+Names come from PyJHora in the requested `language` and are the same for `north` and `south`
+(English uses Sanskrit transliterations such as "Rahu" and "Ashwini"). See
+[the PyJHora 5 migration notes](docs/pyjhora-5-upgrade.md) for names that changed. Any unsupported
+`language` is treated as `en`.
 
 `chart_style` is echoed in `data.meta` so the client knows which rendering convention to apply. `house_signs` enables both north (house-fixed diamond) and south (sign-fixed grid) layouts from the same data.
 
@@ -69,10 +67,10 @@ Generates a full Vedic horoscope: per-planet data (sign, house, longitude, digni
       "lord":              "Saturn",
       "lord_symbol":       "♄",
       "nakshatra": {
-        "name":        "Sadhayam",
+        "name":        "Shatabhisha",
         "index":       24,
         "pada":        1,
-        "lord":        "Raagu",
+        "lord":        "Rahu",
         "lord_symbol": "☊"
       }
     },
@@ -96,7 +94,7 @@ Generates a full Vedic horoscope: per-planet data (sign, house, longitude, digni
           "label":  "Neecham/Defibilated"
         },
         "nakshatra": {
-          "name":        "Uthiraadam",
+          "name":        "Uttara Ashadha",
           "index":       21,
           "pada":        3,
           "lord":        "Sun",
@@ -108,7 +106,7 @@ Generates a full Vedic horoscope: per-planet data (sign, house, longitude, digni
       "D1":  [["Lagna", "Sun"], [], [], ["Moon"], [], [], [], [], [], [], [], []],
       "D2":  [[], [], [], [], [], [], [], [], [], [], [], []],
       "D9":  [[], [], [], [], [], [], [], [], [], [], [], []],
-      "D60": [[], [], [], [], [], [], [], [], [], [], [], []]
+      "D150": [[], [], [], [], [], [], [], [], [], [], [], []]
     },
     "house_signs": [10, 11, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
   }
@@ -156,9 +154,9 @@ Generates a full Vedic horoscope: per-planet data (sign, house, longitude, digni
 
 ##### `charts`
 
-Dictionary keyed `D1`–`D60` (23 divisional charts). Each value is a 12-element array (one per house) where each element is a list of planet name strings in that house. D2 (Hora) uses the Traditional Parasara method.
+Dictionary keyed `D1`–`D150` (24 divisional charts). Each value is a 12-element array (one per house) where each element is a list of planet name strings in that house. D2 (Hora) uses the Traditional Parasara method.
 
-Supported divisional chart factors: `1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 16, 20, 24, 27, 30, 40, 45, 60, 81, 108, 144`.
+Supported divisional chart factors: `1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 16, 20, 24, 27, 30, 40, 45, 60, 81, 108, 144, 150`.
 
 ##### `house_signs`
 
@@ -223,6 +221,19 @@ Returns cache statistics for horoscope and dasha caches. No authentication requi
   "dasha_cache": { "...": "..." }
 }
 ```
+
+---
+
+## Local setup
+
+Run from `pyfastapi/`:
+
+```bash
+pip install -r requirements.txt
+pip install --no-deps -r requirements-nodeps.txt
+```
+
+See [DEPENDENCIES.md](pyfastapi/DEPENDENCIES.md).
 
 ---
 

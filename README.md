@@ -217,7 +217,7 @@ Returns cache statistics for horoscope and dasha caches. No authentication requi
     "config": {
       "ttl_seconds": 900, "max_entries": 1024,
       "lat_lng_precision": 2, "tz_precision": 2,
-      "key_prefix": "horoscope:v1"
+      "key_prefix": "horoscope:v2"
     }
   },
   "dasha_cache": { "...": "..." }
@@ -248,6 +248,6 @@ CACHE_MAX_ENTRIES=1024
 CACHE_LAT_LNG_PRECISION=2
 CACHE_TZ_PRECISION=2
 TZ_AUTO_CORRECT=true
-CACHE_KEY_PREFIX=horoscope:v1
-DASHA_CACHE_KEY_PREFIX=dasha:v1
+CACHE_KEY_PREFIX=horoscope:v2
+DASHA_CACHE_KEY_PREFIX=dasha:v2
 ```

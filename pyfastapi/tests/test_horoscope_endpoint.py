@@ -204,8 +204,10 @@ def test_horoscope_returns_expected_response_shape(app_client, valid_payload):
     karaka_values = {p["jaimini_karaka"] for p in planets}
     assert None in karaka_values
     assert any(v is not None for v in karaka_values)
-    assert any(p["jaimini_karaka"] is not None for p in data["divisions"]["D9"]["planets"])
-    assert all(p["jaimini_karaka"] is None for p in data["divisions"]["D2"]["planets"])
+    # Rasi-chart karakas are carried into every varga, D2 included (PVR §7.3.6, §8.2).
+    rasi_karakas = [p["jaimini_karaka"] for p in planets]
+    for code in ("D2", "D9"):
+        assert [p["jaimini_karaka"] for p in data["divisions"][code]["planets"]] == rasi_karakas
 
 
 @pytest.mark.parametrize("chart_style", ["north", "south"])

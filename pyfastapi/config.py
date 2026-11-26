@@ -1,5 +1,6 @@
 import atexit
 import contextlib
+import functools
 import logging
 import os
 
@@ -72,7 +73,10 @@ from jhora.panchanga import drik
 # planet_list mid-request regardless of our setting, so forcing MEAN_NODE
 # globally is not reliably achievable without patching multiple internal
 # pyjhora call sites. Rahu/Ketu longitudes intentionally use TRUE_NODE.
-drik.set_ayanamsa_mode('LAHIRI')
+# Ref: PVR Narasimha Rao, "Vedic Astrology: An Integrated Approach" §1.3.13 ("We will use
+# Chitrapaksha/Lahiri ayanamsa"); Santhanam's notes to BPHS ch. 4.
+AYANAMSA_MODE = "LAHIRI"
+drik.set_ayanamsa_mode(AYANAMSA_MODE)
 
 # pyjhora 5 defaults to a true tropical dasha year. Pin the mean sidereal year,
 # which keeps Vimshottari and Ashtottari dates within a day of earlier releases
@@ -84,3 +88,29 @@ const.dhasa_year_duration_default = const.DHASA_YEAR_DURATION.MEAN_SIDEREAL_YEAR
 # -------------------------------------------------------------------
 # Languages the API offers. PyJHora ships more, but only these have been verified.
 SUPPORTED_LANGUAGES = ("en", "hi", "ta", "te", "ka", "ml")
+
+
+# -------------------------------------------------------------------
+# Per-thread engine state
+# -------------------------------------------------------------------
+def ensure_engine_state() -> None:
+    """Apply the ayanamsa and ephemeris path in the calling thread.
+
+    Swiss Ephemeris keeps the sidereal mode and the ephemeris path in thread-local
+    storage. The module-level calls above only reach the import thread, so a request
+    served from FastAPI's threadpool would otherwise fall back to Swiss Ephemeris'
+    default sidereal mode (Fagan-Bradley, about 0.88 degrees from Lahiri).
+    """
+    configure_ephemeris_path(ephe_path)
+    drik.set_ayanamsa_mode(AYANAMSA_MODE)
+
+
+def with_engine_state(func):
+    """Decorator for service entry points: set per-thread engine state before computing."""
+
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        ensure_engine_state()
+        return func(*args, **kwargs)
+
+    return wrapper

@@ -26,7 +26,7 @@ class CacheConfig:
             max_entries=max(1, int(os.getenv("CACHE_MAX_ENTRIES", "1024"))),
             lat_lng_precision=max(0, int(os.getenv("CACHE_LAT_LNG_PRECISION", "2"))),
             tz_precision=max(0, int(os.getenv("CACHE_TZ_PRECISION", "2"))),
-            key_prefix=os.getenv("CACHE_KEY_PREFIX", "horoscope:v2"),
+            key_prefix=os.getenv("CACHE_KEY_PREFIX", "horoscope:v3"),
         )
 
 

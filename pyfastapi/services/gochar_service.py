@@ -5,7 +5,7 @@ from jhora import const, utils
 from jhora.horoscope.chart import charts
 from jhora.panchanga import drik
 
-from config import suppress_third_party_stdout
+from config import suppress_third_party_stdout, with_engine_state
 from helpers import ChartCleaner
 from models import GocharRequest
 
@@ -50,6 +50,7 @@ def _get_natal_ref_signs(rasi_positions) -> tuple[int, int]:
     return lagna_sign, moon_sign
 
 
+@with_engine_state
 def build_gochar_payload(data: GocharRequest) -> Dict:
     year, month, day = [int(p) for p in data.dob.split("-")]
     hour, minute = [int(p) for p in data.time.split(":")]

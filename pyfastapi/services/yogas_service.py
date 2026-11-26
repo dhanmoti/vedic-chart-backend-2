@@ -5,7 +5,7 @@ from jhora.horoscope.chart import yoga
 from jhora.panchanga import drik
 from jhora import utils
 
-from config import suppress_third_party_stdout
+from config import suppress_third_party_stdout, with_engine_state
 from models import HoroscopeRequest
 
 logger = logging.getLogger("uvicorn.error")
@@ -21,6 +21,7 @@ _YOGAS_TO_CHECK = [
 ]
 
 
+@with_engine_state
 def build_yogas_payload(data: HoroscopeRequest) -> Dict:
     year, month, day = [int(p) for p in data.dob.split("-")]
     hour, minute = [int(p) for p in data.time.split(":")]

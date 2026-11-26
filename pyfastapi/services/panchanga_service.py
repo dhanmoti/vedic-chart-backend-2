@@ -4,7 +4,7 @@ from typing import Dict, List
 from jhora import utils
 from jhora.panchanga import drik
 
-from config import suppress_third_party_stdout
+from config import suppress_third_party_stdout, with_engine_state
 from models import PanchangaRequest
 
 logger = logging.getLogger("uvicorn.error")
@@ -34,6 +34,7 @@ def _jd_to_local_hhmm(jd_utc: float, tz: float) -> str:
     return f"{h:02d}:{m:02d}"
 
 
+@with_engine_state
 def build_panchanga_payload(data: PanchangaRequest) -> Dict:
     year, month, day = [int(p) for p in data.date.split("-")]
     hour, minute = [int(p) for p in data.time.split(":")]

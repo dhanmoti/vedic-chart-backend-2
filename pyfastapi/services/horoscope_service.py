@@ -5,7 +5,7 @@ from jhora import const, utils
 from jhora.horoscope.chart import charts, house
 from jhora.panchanga import drik
 
-from config import configure_ephemeris_path, ephe_path, suppress_third_party_stdout
+from config import suppress_third_party_stdout, with_engine_state
 from helpers import ChartCleaner
 from models import AscendantInfo, DignityInfo, DivisionChartInfo, DivisionPlanetInfo, HoroscopeRequest, NakshatraInfo, PlanetInfo
 from services.chart_service import traditional_parasara_hora_from_rasi_positions
@@ -33,6 +33,20 @@ _DIGNITY_STATUS_MAP = {
     2: "neutral",
     1: "enemy",
     0: "debilitated",
+}
+
+
+# Ref: BPHS 32.13-17 (Atma, Amatya, Bhratru, Matru, Pitru, Putr, Gnati, Stri) and PVR,
+# Vedic Astrology: An Integrated Approach §8.2 Table 13 (4 = Matri Karaka, 8 = Dara Karaka).
+# PyJHora's resource strings label the 4th "Maitra" (friend) and the 8th "Dhatha"; these
+# override those two positions per language.
+_KARAKA_LABEL_FIXES: Dict[str, Dict[int, str]] = {
+    "en": {3: "Matri Karaka", 7: "Dara Karaka"},
+    "hi": {3: "मातृकारक", 7: "दारकारक"},
+    "ta": {3: "மாத்ரு காரகன்", 7: "தார காரகன்"},
+    "te": {3: "మాతృ కారక", 7: "దార కారక"},
+    "ka": {3: "ಮಾತೃ ಕಾರಕ", 7: "ದಾರ ಕಾರಕ"},
+    "ml": {3: "മാതൃ കരകൻ", 7: "ദാര കരകൻ"},
 }
 
 
@@ -70,6 +84,8 @@ def _load_names(language: str) -> Dict[str, List[str]]:
         ChartCleaner.clean_unicode(utils.resource_strings[f"{key}_str"])
         for key in house.chara_karaka_names
     ]
+    for rank, label in _KARAKA_LABEL_FIXES.get(language, {}).items():
+        karaka_names[rank] = label
 
     with suppress_third_party_stdout():
         utils.set_language("en")
@@ -237,11 +253,10 @@ def _chart_houses(positions: List, names: Dict[str, List[str]]) -> List[List[str
 
 
 def _division_info(
-    positions: List, planet_list: List[PlanetInfo], names: Dict[str, List[str]]
+    positions: List, planet_list: List[PlanetInfo], names: Dict[str, List[str]], karakas: Dict[int, str]
 ) -> DivisionChartInfo:
     placements = dict(positions)
     lagna_sign = placements[const._ascendant_symbol][0]
-    karakas = _jaimini_karakas(positions, names)
     planets = []
     for p in planet_list:
         sign_idx, long_in_sign = placements[p.id]
@@ -260,7 +275,7 @@ def _division_info(
 
 
 def _hora_division_info(
-    d2_chart: List[List[str]], planet_list: List[PlanetInfo], names: Dict[str, List[str]]
+    d2_chart: List[List[str]], planet_list: List[PlanetInfo], names: Dict[str, List[str]], karakas: Dict[int, str]
 ) -> DivisionChartInfo:
     name_to_sign: Dict[str, int] = {
         name: sign_idx
@@ -280,6 +295,7 @@ def _hora_division_info(
             sign_symbol=const._zodiac_symbols[sign_idx],
             longitude_in_sign=round((p.longitude_in_sign * 2) % 30, 4),
             house=(sign_idx - lagna_sign) % 12 + 1,
+            jaimini_karaka=karakas.get(p.id),
         ))
     return DivisionChartInfo(planets=planets)
 
@@ -288,6 +304,8 @@ def _build_charts_and_divisions(
     jd_local: float, place, planet_list: List[PlanetInfo], names: Dict[str, List[str]]
 ) -> Tuple[Dict[str, List[List[str]]], Dict[str, DivisionChartInfo]]:
     rasi_positions = _chart_positions(jd_local, place, 1)
+    # Chara karakas are fixed from the rasi chart and carried into every varga.
+    # Ref: PVR §7.3.6 (Karakamsa = navamsa sign of the rasi-chart atma karaka), §8.2.
     rasi_karakas = _jaimini_karakas(rasi_positions, names)
     for planet_info in planet_list:
         planet_info.jaimini_karaka = rasi_karakas.get(planet_info.id)
@@ -301,15 +319,16 @@ def _build_charts_and_divisions(
         elif factor == 2:
             # D2 is always Traditional Parasara, regardless of pyjhora defaults.
             chart_data[code] = traditional_parasara_hora_from_rasi_positions(rasi_positions, names["planet_names"])
-            divisions[code] = _hora_division_info(chart_data[code], planet_list, names)
+            divisions[code] = _hora_division_info(chart_data[code], planet_list, names, rasi_karakas)
         else:
             positions = _chart_positions(jd_local, place, factor)
             chart_data[code] = _chart_houses(positions, names)
-            divisions[code] = _division_info(positions, planet_list, names)
+            divisions[code] = _division_info(positions, planet_list, names, rasi_karakas)
 
     return chart_data, divisions
 
 
+@with_engine_state
 def build_horoscope_payload(data: HoroscopeRequest) -> Dict[str, object]:
     year, month, day = [int(p) for p in data.dob.split("-")]
     hour, minute = [int(p) for p in data.time.split(":")]
@@ -317,8 +336,6 @@ def build_horoscope_payload(data: HoroscopeRequest) -> Dict[str, object]:
     place = drik.Place("Birth Place", data.lat, data.lng, data.tz)
     jd_local = utils.julian_day_number(date_in, (hour, minute, 0))
     jd_utc = jd_local - (data.tz / 24.0)
-
-    configure_ephemeris_path(ephe_path)
 
     names = _load_names(data.language)
     ascendant_info, asc_sign_idx = _build_ascendant(jd_local, place, names)

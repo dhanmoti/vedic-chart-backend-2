@@ -7,7 +7,8 @@ For backend and front-end developers, and for whoever signs off astrological res
 - The JSON structure of every endpoint is unchanged. `/horoscope` gains a `D150` key in `charts` and `divisions`.
 - Many display strings change. Match on `id`, `index` and `sign_index`, not on names.
 - **Dasha results change.** Vimshottari and Ashtottari keep their sequence, with dates within one day. The other nine systems differ materially and **need astrological sign-off before release**.
-- Divisional-chart `jaimini_karaka` values change because a previous bug is fixed.
+- **All calculations now really use Lahiri.** Swiss Ephemeris keeps the ayanamsa per thread, and requests run in worker threads, so before this change they used Fagan-Bradley (about 0.88° off) on Linux. This also affected 4.8.7 in production. Every longitude, varga and dasha date served before this release may differ.
+- `jaimini_karaka` now uses the rasi-chart karakas in every division (PVR §7.3.6, §8.2), and two English labels change (see below).
 
 ## How this was measured
 
@@ -21,7 +22,7 @@ The comparison covers those inputs only, and it shows what changed, not which ve
 |---|---|
 | Planet longitudes, signs, houses, chart occupancy, ashtakavarga, the seven yogas | No change observed |
 | `divisions.*.planets[].longitude_in_sign` | Differs by up to 0.0002° (now rounded from the exact value, previously cut to whole arc-seconds) |
-| `divisions.*.planets[].jaimini_karaka` | Fixed. D3–D144 assigned karakas to the wrong planets; they now use the same ranking rule as D1. D1 is unchanged |
+| `divisions.*.planets[].jaimini_karaka` | Every division, D2 included, now repeats the D1 karakas (PVR §7.3.6: the Karakamsa is the navamsa sign of the rasi-chart atma karaka). D1 is unchanged |
 | Dignity | Jupiter in Virgo is now `enemy` (score 1), previously `friend` (score 3) |
 | Arudha | Differs for 2 of 20 births (one graha arudha, one bhava arudha). PyJHora now counts Rahu/Ketu longitude backwards when comparing co-lords |
 | Panchanga `lunar_month` | `Month0` is fixed (now `Phalguna`). PyJHora rewrote the calculation, so some dates near a month boundary also move (seen: Ashadha → Jyeshtha, Chaitra → Phalguna) |
@@ -29,7 +30,9 @@ The comparison covers those inputs only, and it shows what changed, not which ve
 
 ### Dasha systems
 
-Pinned settings: Lahiri ayanamsa, mean sidereal year (365.256364 days), Kalachakra "PVR / Sanjay Rath", Drig "PVR paper".
+Pinned settings follow PVR Narasimha Rao's *Vedic Astrology: An Integrated Approach* (project decision, 2026-11-26): Lahiri ayanamsa, solar (mean sidereal) year of 365.256364 days (PVR ch. 16), Kalachakra "PVR / Sanjay Rath", Drig "PVR book", Narayana "PVR book", Sudasa "PVR book".
+
+Sudasa and Lagna Kendradi rasi dasa get a second cycle that PyJHora 5 dropped: each rasi's second-cycle period is 12 years minus its first-cycle period (PVR §18.2 note 2, §19.2(6), §20.2(6)). The table below was measured before these three changes; the rows for `drig`, `lagna_kendradi_rasi` and `sudasa` need re-measuring.
 "Within 1 day" is the share of old pratyantardasha rows whose lord sequence still exists with a start date within one day.
 
 | System | Sequence | Within 1 day | Largest shift |
@@ -37,13 +40,13 @@ Pinned settings: Lahiri ayanamsa, mean sidereal year (365.256364 days), Kalachak
 | `vimshottari` | Same | 100% | 1 day |
 | `ashtottari` | Same | 100% | 1 day |
 | `shoola` | Same lords | 94% | about 4.9 years |
-| `drig` | Same lords | 73% | about 4.5 years |
+| `drig` | PVR book method; re-measure | – | – |
 | `narayana` | Same lords | 26% | about 12 years |
 | `niryaana_shoola` | Same lords, fewer periods (24 → 17 mahadashas in a sampled chart) | 14% | about 189 years |
 | `yogini` | Same lords | 4% | about 15 months |
-| `lagna_kendradi_rasi` | Half as many periods (24 → 12) | 1% | about 98 years |
+| `lagna_kendradi_rasi` | 24 periods again (two cycles); re-measure | – | – |
 | `chara` | 99% of sequences present; some charts have fewer periods | under 1% | about 12 years |
-| `sudasa` | Half as many periods (24 → 12) | under 1% | about 198 years |
+| `sudasa` | 24 periods again (two cycles), PVR book method; re-measure | – | – |
 | `kalachakra` | 37% of sequences present | 0% | about 87 years |
 
 Large shifts mostly come from periods moving between cycles. Pinning 5.0.6's "true sidereal" year
@@ -117,14 +120,16 @@ plus a Hindi tithi list that had empty entries, so 4.8.7 returned the wrong name
 | `ka` | karana | 32 | ಕಾಗೆ | ಕೌಲವ |
 | `ka` | karana | 58 | ಶಕುನ | ಶಕುನಿ |
 
-Hindi karaka labels also changed (the other languages' karaka labels did not):
+Karaka labels now follow BPHS 32.13-17 and PVR §8.2 Table 13 in every language. The 4th karaka is Matri (mother), where PyJHora says Maitra (friend), and the 8th is Dara (spouse). English: `Maitra Karaka` → `Matri Karaka`, `Dhatha Karaka` → `Dara Karaka`. Positions 4 and 8 in `ta`, `te`, `ka` and `ml` change the same way.
+
+Hindi karaka labels (old 4.8.7 → new):
 
 | Old | New |
 |---|---|
 | आत्मा कारक | आत्मकारक |
 | अमात्य कारक | अमात्यकारक |
 | भ्रात्रि कारक | भ्रातृकारक |
-| मैत्र कारक | मैत्रकारक |
+| मैत्र कारक | मातृकारक |
 | पितृ कारक | पितृकारक |
 | पुत्र कारक | पुत्रकारक |
 | ज्ञानी कारक | ज्ञातिकारक |
@@ -239,11 +244,12 @@ repeated names are listed once.
 - **Settings:** 5.0.6's `jhora/__init__.py` names `initialize_runtime` without calling it, so its settings files
   are not applied on import. If upstream fixes that, library defaults will change; `tests/test_pyjhora_compat.py`
   checks the settings this service pins.
-- **Cache:** key prefixes are `:v2`. Deployments that set `*_CACHE_KEY_PREFIX` keep their own value.
+- **Thread state:** every service entry point is wrapped in `config.with_engine_state`, which sets the ayanamsa and ephemeris path in the calling thread. `tests/test_pyjhora_compat.py::test_worker_thread_computes_with_lahiri` guards it.
+- **Cache:** key prefixes are `:v3`. Deployments that set `*_CACHE_KEY_PREFIX` keep their own value, so bump them too.
 
 ## Release and rollback
 
-1. Astrological sign-off on dasha, karaka, dignity, arudha and lunar month changes.
+1. Astrological sign-off on dasha, dignity, arudha and lunar month changes (karaka and dasha-method conventions follow PVR's book).
 2. Release a front end that accepts both spellings.
 3. Build the image and smoke-test it, then deploy.
 
@@ -256,4 +262,3 @@ Roll back by redeploying the previous revision, or by reverting the merge.
   results in testing. The deploy script's concurrency of 2 allows it. Fix separately.
 - `suppress_third_party_stdout()` is not thread-safe and can leave stdout redirected after concurrent requests
   (also present before).
-- The pinned `numpy==2.4.0` has been yanked from PyPI.

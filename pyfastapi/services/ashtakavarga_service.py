@@ -5,7 +5,7 @@ from jhora.horoscope.chart import ashtakavarga, charts
 from jhora.panchanga import drik
 from jhora import utils
 
-from config import suppress_third_party_stdout
+from config import suppress_third_party_stdout, with_engine_state
 from models import HoroscopeRequest
 
 logger = logging.getLogger("uvicorn.error")
@@ -26,6 +26,7 @@ def _build_house_to_planet_list(rasi_positions) -> List[str]:
     return house_to_planet
 
 
+@with_engine_state
 def build_ashtakavarga_payload(data: HoroscopeRequest) -> Dict:
     year, month, day = [int(p) for p in data.dob.split("-")]
     hour, minute = [int(p) for p in data.time.split(":")]

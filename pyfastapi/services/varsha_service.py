@@ -5,7 +5,7 @@ from jhora import utils
 from jhora.horoscope.transit import tajaka
 from jhora.panchanga import drik
 
-from config import suppress_third_party_stdout
+from config import suppress_third_party_stdout, with_engine_state
 from helpers import ChartCleaner
 from models import VarshaRequest
 
@@ -41,6 +41,7 @@ def _positions_to_house_chart(positions, planet_names: List[str]) -> List[List[s
     return houses
 
 
+@with_engine_state
 def build_varsha_payload(data: VarshaRequest) -> Dict:
     year, month, day = [int(p) for p in data.dob.split("-")]
     hour, minute = [int(p) for p in data.time.split(":")]

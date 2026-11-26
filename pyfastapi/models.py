@@ -1,8 +1,72 @@
+import os
 import re
-from datetime import date
+from datetime import date, datetime
 from typing import Dict, List, Literal, Optional
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, PrivateAttr, field_validator, model_validator
+from timezonefinder import TimezoneFinder
+
+TZ_ID_DESC = (
+    "Optional IANA zone ID (e.g. 'Asia/Kolkata'). When given, it takes precedence over `tz`; "
+    "the UTC offset (incl. DST/historical changes) is resolved for the birth date and time."
+)
+
+
+def resolve_tz_offset(tz_id: str, date_str: str, time_str: str, fold: int = 0) -> float:
+    """UTC offset in hours in effect in `tz_id` at the given local date/time (DST/history aware)."""
+    try:
+        zone = ZoneInfo(tz_id)
+    except (ZoneInfoNotFoundError, ValueError, OSError):
+        raise ValueError(f"unknown tz_id '{tz_id}'")
+    y, m, d = [int(p) for p in date_str.split("-")]
+    hh, mm = [int(p) for p in time_str.split(":")]
+    offset = datetime(y, m, d, hh, mm, tzinfo=zone, fold=fold).utcoffset()
+    return offset.total_seconds() / 3600.0
+
+
+_TZ_FINDER: Optional[TimezoneFinder] = None
+
+
+def _infer_tz_id(lat: float, lng: float) -> Optional[str]:
+    global _TZ_FINDER
+    if _TZ_FINDER is None:
+        _TZ_FINDER = TimezoneFinder()
+    zone = _TZ_FINDER.timezone_at(lat=lat, lng=lng)
+    # Etc/GMT* is open ocean: no DST/history to correct
+    return zone if zone and not zone.startswith("Etc/") else None
+
+
+def _naive_offsets(tz_id: str) -> set:
+    """Offsets a client would plausibly send today for this zone: now, and mid-winter/mid-summer of this year."""
+    zone = ZoneInfo(tz_id)
+    now = datetime.now(zone)
+    samples = (now, datetime(now.year, 1, 1, 12, tzinfo=zone), datetime(now.year, 7, 1, 12, tzinfo=zone))
+    return {sample.utcoffset().total_seconds() / 3600.0 for sample in samples}
+
+
+def _auto_correct_tz(model, date_str: str, time_str: str) -> None:
+    """Fix a client-sent `tz` that is just the zone's present-day offset when the birth-time offset differed
+    (DST, historical changes). A `tz` that matches neither is trusted as-is."""
+    if os.getenv("TZ_AUTO_CORRECT", "true").strip().lower() not in ("1", "true", "yes"):
+        return
+    zone = _infer_tz_id(model.lat, model.lng)
+    if not zone:
+        return
+    # Both folds: in a repeated or skipped DST hour either offset may be what the client meant
+    at_event = {resolve_tz_offset(zone, date_str, time_str, fold) for fold in (0, 1)}
+    if model.tz not in at_event and model.tz in _naive_offsets(zone):
+        model.tz_id = zone
+
+
+def _apply_tz_id(model, date_str: str, time_str: str):
+    if not model.tz_id:
+        if model.tz is None:
+            raise ValueError("either tz or tz_id is required")
+        _auto_correct_tz(model, date_str, time_str)
+    if model.tz_id:
+        model.tz = resolve_tz_offset(model.tz_id, date_str, time_str)
+    return model
 
 
 class LanguageEntry(BaseModel):
@@ -20,7 +84,8 @@ class HoroscopeRequest(BaseModel):
     time: str
     lat: float
     lng: float
-    tz: float
+    tz: Optional[float] = None
+    tz_id: Optional[str] = Field(None, description=TZ_ID_DESC)
     language: str = "en"
     chart_style: Literal["north", "south"] = "south"
 
@@ -54,9 +119,13 @@ class HoroscopeRequest(BaseModel):
 
     @field_validator("tz")
     def validate_tz(cls, value):
-        if not (-14.0 <= value <= 14.0):
+        if value is not None and not (-14.0 <= value <= 14.0):
             raise ValueError("tz must be between -14 and 14")
         return value
+
+    @model_validator(mode="after")
+    def resolve_tz(self):
+        return _apply_tz_id(self, self.dob, self.time)
 
 
 class NakshatraInfo(BaseModel):
@@ -187,11 +256,24 @@ class GocharRequest(BaseModel):
     time: str = Field(..., description="Time of birth in 24-hour format (HH:MM)")
     lat: float = Field(..., ge=-90.0, le=90.0, description="Latitude (-90 to 90)")
     lng: float = Field(..., ge=-180.0, le=180.0, description="Longitude (-180 to 180)")
-    tz: float = Field(..., ge=-14.0, le=14.0, description="Timezone offset in hours (-14 to 14)")
+    tz: Optional[float] = Field(None, ge=-14.0, le=14.0, description="Timezone offset in hours (-14 to 14). Required unless tz_id is given")
+    tz_id: Optional[str] = Field(None, description=TZ_ID_DESC)
     language: str = Field("en", description="Language code for output labels")
     chart_style: Literal["north", "south"] = Field("south", description="Chart style: 'north' uses Sanskrit English planet/nakshatra names, 'south' uses standard transliteration")
     transit_date: str = Field(..., description="Date to compute planetary positions for (YYYY-MM-DD)")
     transit_time: str = Field("12:00", description="Time of transit calculation in 24-hour format (HH:MM), defaults to noon")
+    _transit_tz: Optional[float] = PrivateAttr(default=None)
+
+    @model_validator(mode="after")
+    def resolve_tz(self):
+        _apply_tz_id(self, self.dob, self.time)
+        if self.tz_id:
+            self._transit_tz = resolve_tz_offset(self.tz_id, self.transit_date, self.transit_time)
+        return self
+
+    @property
+    def transit_tz(self) -> float:
+        return self._transit_tz if self._transit_tz is not None else self.tz
 
     @field_validator("dob", "transit_date")
     def validate_date_format(cls, value):
@@ -239,10 +321,15 @@ class VarshaRequest(BaseModel):
     time: str = Field(..., description="Time of birth in 24-hour format (HH:MM)")
     lat: float = Field(..., ge=-90.0, le=90.0, description="Latitude (-90 to 90)")
     lng: float = Field(..., ge=-180.0, le=180.0, description="Longitude (-180 to 180)")
-    tz: float = Field(..., ge=-14.0, le=14.0, description="Timezone offset in hours (-14 to 14)")
+    tz: Optional[float] = Field(None, ge=-14.0, le=14.0, description="Timezone offset in hours (-14 to 14). Required unless tz_id is given")
+    tz_id: Optional[str] = Field(None, description=TZ_ID_DESC)
     language: str = Field("en", description="Language code for output labels")
     chart_style: Literal["north", "south"] = Field("south", description="Chart style: 'north' uses Sanskrit English planet names, 'south' uses standard transliteration")
     year: int = Field(..., ge=1, le=120, description="Year of life for the annual chart (e.g. 35 for the 35th year)")
+
+    @model_validator(mode="after")
+    def resolve_tz(self):
+        return _apply_tz_id(self, self.dob, self.time)
 
     @field_validator("dob")
     def validate_dob(cls, value):
@@ -277,9 +364,14 @@ class PanchangaRequest(BaseModel):
     time: str = Field("06:00", description="Time of day in 24-hour format (HH:MM), defaults to 06:00")
     lat: float = Field(..., ge=-90.0, le=90.0, description="Latitude (-90 to 90)")
     lng: float = Field(..., ge=-180.0, le=180.0, description="Longitude (-180 to 180)")
-    tz: float = Field(..., ge=-14.0, le=14.0, description="Timezone offset in hours (-14 to 14)")
+    tz: Optional[float] = Field(None, ge=-14.0, le=14.0, description="Timezone offset in hours (-14 to 14). Required unless tz_id is given")
+    tz_id: Optional[str] = Field(None, description=TZ_ID_DESC)
     language: str = Field("en", description="Language code for output labels")
     chart_style: Literal["north", "south"] = Field("south", description="Chart style: 'north' uses Sanskrit English nakshatra names, 'south' uses standard transliteration")
+
+    @model_validator(mode="after")
+    def resolve_tz(self):
+        return _apply_tz_id(self, self.date, self.time)
 
     @field_validator("date")
     def validate_date(cls, value):

@@ -56,6 +56,7 @@ async def get_gochar(request: Request, data: GocharRequest) -> GocharResponse:
         )
         normalized_key_fields["transit_date"] = data.transit_date
         normalized_key_fields["transit_time"] = data.transit_time
+        normalized_key_fields["transit_tz"] = data.transit_tz
         normalized_key_fields["chart_style"] = data.chart_style
         cache_key = GOCHAR_CACHE.build_cache_key(normalized_key_fields)
         cached_payload = GOCHAR_CACHE.get(cache_key)

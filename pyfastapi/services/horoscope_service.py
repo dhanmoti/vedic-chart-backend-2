@@ -418,6 +418,7 @@ def build_horoscope_payload(data: HoroscopeRequest) -> Dict[str, object]:
             "meta": {
                 "chart_style": data.chart_style,
                 "language": data.language,
+                **({"tz_id": data.tz_id, "tz_offset": f"{data.tz:g}"} if data.tz_id else {}),
             },
             "ascendant": ascendant_info,
             "planets": planet_list,

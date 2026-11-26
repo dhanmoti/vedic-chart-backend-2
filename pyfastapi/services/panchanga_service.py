@@ -1,45 +1,30 @@
 import logging
-from typing import Dict
+from typing import Dict, List
 
 from jhora import utils
 from jhora.panchanga import drik
 
 from config import suppress_third_party_stdout
-from helpers import NORTH_EN_NAKSHATRA_NAMES
 from models import PanchangaRequest
 
 logger = logging.getLogger("uvicorn.error")
 
-_VAARA_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
 
-_YOGA_NAMES = [
-    "Vishkambha", "Priti", "Ayushman", "Saubhagya", "Shobhana",
-    "Atiganda", "Sukarman", "Dhriti", "Shula", "Ganda",
-    "Vriddhi", "Dhruva", "Vyaghata", "Harshana", "Vajra",
-    "Siddhi", "Vyatipata", "Variyan", "Parigha", "Shiva",
-    "Siddha", "Sadhya", "Shubha", "Shukla", "Brahma",
-    "Indra", "Vaidhriti",
-]
-
-_LUNAR_MONTH_NAMES = [
-    "Chaitra", "Vaishakha", "Jyeshtha", "Ashadha",
-    "Shravana", "Bhadrapada", "Ashvina", "Kartika",
-    "Margashirsha", "Pausha", "Magha", "Phalguna",
-]
-
-
-def _get_name_lists(language: str, chart_style: str):
+def _get_name_lists(language: str) -> Dict[str, List[str]]:
     with suppress_third_party_stdout():
         utils.set_language(language)
-    tithi_names = [utils.TITHI_LIST[i] for i in range(min(30, len(utils.TITHI_LIST)))]
-    nak_names = [utils.NAKSHATRA_LIST[i].strip() for i in range(min(28, len(utils.NAKSHATRA_LIST)))]
-    karana_names = [utils.KARANA_LIST[i] for i in range(min(60, len(utils.KARANA_LIST)))]
+    names = {
+        "vaara": list(utils.DAYS_LIST),
+        "tithi": list(utils.TITHI_LIST),
+        "nakshatra": [name.strip() for name in utils.NAKSHATRA_LIST],
+        "yoga": list(utils.YOGAM_LIST),
+        "karana": list(utils.KARANA_LIST),
+        "lunar_month": list(utils.MONTH_LIST),
+    }
     if language != "en":
         with suppress_third_party_stdout():
             utils.set_language("en")
-    if chart_style == "north" and language == "en":
-        nak_names = list(NORTH_EN_NAKSHATRA_NAMES)
-    return tithi_names, nak_names, karana_names
+    return names
 
 
 def _jd_to_local_hhmm(jd_utc: float, tz: float) -> str:
@@ -56,7 +41,7 @@ def build_panchanga_payload(data: PanchangaRequest) -> Dict:
     place = drik.Place("", data.lat, data.lng, data.tz)
     jd = utils.julian_day_number(date_in, (hour, minute, 0))
 
-    tithi_names, nak_names, karana_names = _get_name_lists(data.language, data.chart_style)
+    names = _get_name_lists(data.language)
 
     with suppress_third_party_stdout():
         tithi_result = drik.tithi(jd, place)
@@ -68,27 +53,23 @@ def build_panchanga_payload(data: PanchangaRequest) -> Dict:
         sunrise_result = drik.sunrise(jd, place)
         sunset_result = drik.sunset(jd, place)
 
+    def name_at(kind: str, position: int, index: int) -> str:
+        options = names[kind]
+        return options[position].strip() if 0 <= position < len(options) else f"{kind}{index}"
+
     tithi_idx = int(tithi_result[0])
-    tithi_name = tithi_names[tithi_idx - 1] if 0 < tithi_idx <= len(tithi_names) else f"Tithi{tithi_idx}"
-
     nak_idx = int(nak_result[0])
-    nak_name = nak_names[nak_idx - 1] if 0 < nak_idx <= len(nak_names) else f"Nakshatra{nak_idx}"
-
     yoga_idx = int(yoga_result[0])
-    yoga_name = _YOGA_NAMES[yoga_idx - 1] if 0 < yoga_idx <= len(_YOGA_NAMES) else f"Yoga{yoga_idx}"
-
     karana_idx = int(karana_result[0])
-    karana_name = karana_names[karana_idx - 1] if 0 < karana_idx <= len(karana_names) else f"Karana{karana_idx}"
-
     vaara_idx = int(vaara_result)
-    vaara_name = _VAARA_NAMES[vaara_idx] if 0 <= vaara_idx < len(_VAARA_NAMES) else f"Vaara{vaara_idx}"
-
     lunar_month_idx = int(lunar_month_result[0])
-    lunar_month_name = (
-        _LUNAR_MONTH_NAMES[lunar_month_idx - 1]
-        if 0 < lunar_month_idx <= len(_LUNAR_MONTH_NAMES)
-        else f"Month{lunar_month_idx}"
-    )
+
+    tithi_name = name_at("tithi", tithi_idx - 1, tithi_idx)
+    nak_name = name_at("nakshatra", nak_idx - 1, nak_idx)
+    yoga_name = name_at("yoga", yoga_idx - 1, yoga_idx)
+    karana_name = name_at("karana", karana_idx - 1, karana_idx)
+    vaara_name = name_at("vaara", vaara_idx, vaara_idx)
+    lunar_month_name = name_at("lunar_month", lunar_month_idx - 1, lunar_month_idx)
 
     sunrise_str = sunrise_result[1][:5] if len(sunrise_result[1]) >= 5 else sunrise_result[1]
     sunset_str = sunset_result[1][:5] if len(sunset_result[1]) >= 5 else sunset_result[1]

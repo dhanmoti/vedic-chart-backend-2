@@ -13,17 +13,6 @@ from services.chart_service import traditional_parasara_hora_from_rasi_positions
 
 logger = logging.getLogger("uvicorn.error")
 
-_NORTH_EN_NAKSHATRA_NAMES = [
-    "Ashvini", "Bharani", "Krittika", "Rohini", "Mrigashirsha",
-    "Ardra", "Punarvasu", "Pushya", "Ashlesha", "Magha",
-    "Purva Phalguni", "Uttara Phalguni", "Hasta", "Chitra", "Svati",
-    "Vishakha", "Anuradha", "Jyeshtha", "Mula", "Purvashadha",
-    "Uttarashadha", "Shravana", "Dhanishtha", "Shatabhisha",
-    "Purva Bhadrapada", "Uttara Bhadrapada", "Revati", "Abhijit",
-]
-
-_NORTH_EN_PLANET_NAME_FIXES = {"Raagu": "Rahu", "Kethu": "Ketu"}
-
 # Indexed by planet_list order: Sun=0 … Ketu=8
 _PLANET_COLORS = [
     "sun_fiery_orange",       # 0 Surya
@@ -47,10 +36,9 @@ _DIGNITY_STATUS_MAP = {
 }
 
 
-def _load_names(language: str, chart_style: str) -> Dict[str, List[str]]:
-    """Load planet, sign, nakshatra, ascendant and karaka names for the language and chart style.
+def _load_names(language: str) -> Dict[str, List[str]]:
+    """Load planet, sign, nakshatra, ascendant and karaka names for the language.
 
-    For north+en: applies targeted overrides — Rahu/Ketu names and Sanskrit nakshatras.
     Restores global language to 'en' after loading to avoid leaking state.
     """
     with suppress_third_party_stdout():
@@ -85,10 +73,6 @@ def _load_names(language: str, chart_style: str) -> Dict[str, List[str]]:
 
     with suppress_third_party_stdout():
         utils.set_language("en")
-
-    if chart_style == "north" and language == "en":
-        planet_names = [_NORTH_EN_PLANET_NAME_FIXES.get(n, n) for n in planet_names]
-        nakshatra_names = list(_NORTH_EN_NAKSHATRA_NAMES)
 
     return {
         "planet_names": planet_names,
@@ -336,7 +320,7 @@ def build_horoscope_payload(data: HoroscopeRequest) -> Dict[str, object]:
 
     configure_ephemeris_path(ephe_path)
 
-    names = _load_names(data.language, data.chart_style)
+    names = _load_names(data.language)
     ascendant_info, asc_sign_idx = _build_ascendant(jd_local, place, names)
     planet_list = _build_planet_list(jd_local, jd_utc, place, asc_sign_idx, names)
     house_signs = _compute_house_signs(asc_sign_idx)

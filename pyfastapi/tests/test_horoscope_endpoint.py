@@ -3,6 +3,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+from jhora import utils
 
 import routers.horoscope as horoscope_router
 import services.horoscope_service as horoscope_service
@@ -207,39 +208,13 @@ def test_horoscope_returns_expected_response_shape(app_client, valid_payload):
     assert all(p["jaimini_karaka"] is None for p in data["divisions"]["D2"]["planets"])
 
 
-def test_horoscope_north_style_fixes_rahu_ketu_names(app_client, valid_payload):
-    payload = {**valid_payload, "chart_style": "north", "language": "en"}
-    response = app_client.post("/horoscope", json=payload)
+@pytest.mark.parametrize("chart_style", ["north", "south"])
+def test_horoscope_english_names_come_from_pyjhora_for_both_styles(app_client, valid_payload, chart_style):
+    response = app_client.post("/horoscope", json={**valid_payload, "chart_style": chart_style})
     assert response.status_code == 200
 
-    planets = response.json()["data"]["planets"]
-    rahu = planets[7]
-    ketu = planets[8]
-    assert rahu["name"] == "Rahu", f"Expected 'Rahu', got '{rahu['name']}'"
-    assert ketu["name"] == "Ketu", f"Expected 'Ketu', got '{ketu['name']}'"
-
-
-def test_horoscope_north_style_uses_sanskrit_nakshatra_names(app_client, valid_payload):
-    payload = {**valid_payload, "chart_style": "north", "language": "en"}
-    response = app_client.post("/horoscope", json=payload)
-    assert response.status_code == 200
-
-    planets = response.json()["data"]["planets"]
-    all_nakshatra_names = {p["nakshatra"]["name"] for p in planets}
-    # None of the Tamil-style names should appear in north style
-    tamil_style = {"Aswini", "Karthigai", "Mrigasheesham", "Thiruvaathirai", "Punarpoosam"}
-    assert not all_nakshatra_names.intersection(tamil_style), (
-        f"Tamil names found in north style: {all_nakshatra_names.intersection(tamil_style)}"
-    )
-
-
-def test_horoscope_south_style_uses_pyjhora_rahu_ketu_names(app_client, valid_payload):
-    payload = {**valid_payload, "chart_style": "south", "language": "en"}
-    response = app_client.post("/horoscope", json=payload)
-    assert response.status_code == 200
-
-    planets = response.json()["data"]["planets"]
-    rahu = planets[7]
-    ketu = planets[8]
-    assert rahu["name"] == "Rahu", f"Expected 'Rahu', got '{rahu['name']}'"
-    assert ketu["name"] == "Ketu", f"Expected 'Ketu', got '{ketu['name']}'"
+    data = response.json()["data"]
+    assert data["meta"]["chart_style"] == chart_style
+    assert [data["planets"][7]["name"], data["planets"][8]["name"]] == ["Rahu", "Ketu"]
+    nakshatras = {planet["nakshatra"]["name"] for planet in data["planets"]}
+    assert nakshatras <= set(utils.NAKSHATRA_LIST)

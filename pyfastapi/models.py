@@ -1,11 +1,13 @@
 import os
 import re
 from datetime import date, datetime
-from typing import Dict, List, Literal, Optional
+from typing import Annotated, Dict, List, Literal, Optional
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import BaseModel, Field, PrivateAttr, field_validator, model_validator
+from pydantic import AfterValidator, BaseModel, Field, PrivateAttr, field_validator, model_validator
 from timezonefinder import TimezoneFinder
+
+from config import SUPPORTED_LANGUAGES
 
 TZ_ID_DESC = (
     "Optional IANA zone ID (e.g. 'Asia/Kolkata'). When given, it takes precedence over `tz`; "
@@ -69,6 +71,13 @@ def _apply_tz_id(model, date_str: str, time_str: str):
     return model
 
 
+def _supported_language(value: str) -> str:
+    return value if value in SUPPORTED_LANGUAGES else "en"
+
+
+Language = Annotated[str, AfterValidator(_supported_language)]
+
+
 class LanguageEntry(BaseModel):
     code: str
     name: str
@@ -86,7 +95,7 @@ class HoroscopeRequest(BaseModel):
     lng: float
     tz: Optional[float] = None
     tz_id: Optional[str] = Field(None, description=TZ_ID_DESC)
-    language: str = "en"
+    language: Language = "en"
     chart_style: Literal["north", "south"] = "south"
 
     @field_validator("dob")
@@ -258,8 +267,8 @@ class GocharRequest(BaseModel):
     lng: float = Field(..., ge=-180.0, le=180.0, description="Longitude (-180 to 180)")
     tz: Optional[float] = Field(None, ge=-14.0, le=14.0, description="Timezone offset in hours (-14 to 14). Required unless tz_id is given")
     tz_id: Optional[str] = Field(None, description=TZ_ID_DESC)
-    language: str = Field("en", description="Language code for output labels")
-    chart_style: Literal["north", "south"] = Field("south", description="Chart style: 'north' uses Sanskrit English planet/nakshatra names, 'south' uses standard transliteration")
+    language: Language = Field("en", description="Language code for output labels")
+    chart_style: Literal["north", "south"] = Field("south", description="Chart style chosen by the client; names are the same for both")
     transit_date: str = Field(..., description="Date to compute planetary positions for (YYYY-MM-DD)")
     transit_time: str = Field("12:00", description="Time of transit calculation in 24-hour format (HH:MM), defaults to noon")
     _transit_tz: Optional[float] = PrivateAttr(default=None)
@@ -323,8 +332,8 @@ class VarshaRequest(BaseModel):
     lng: float = Field(..., ge=-180.0, le=180.0, description="Longitude (-180 to 180)")
     tz: Optional[float] = Field(None, ge=-14.0, le=14.0, description="Timezone offset in hours (-14 to 14). Required unless tz_id is given")
     tz_id: Optional[str] = Field(None, description=TZ_ID_DESC)
-    language: str = Field("en", description="Language code for output labels")
-    chart_style: Literal["north", "south"] = Field("south", description="Chart style: 'north' uses Sanskrit English planet names, 'south' uses standard transliteration")
+    language: Language = Field("en", description="Language code for output labels")
+    chart_style: Literal["north", "south"] = Field("south", description="Chart style chosen by the client; names are the same for both")
     year: int = Field(..., ge=1, le=120, description="Year of life for the annual chart (e.g. 35 for the 35th year)")
 
     @model_validator(mode="after")
@@ -366,8 +375,8 @@ class PanchangaRequest(BaseModel):
     lng: float = Field(..., ge=-180.0, le=180.0, description="Longitude (-180 to 180)")
     tz: Optional[float] = Field(None, ge=-14.0, le=14.0, description="Timezone offset in hours (-14 to 14). Required unless tz_id is given")
     tz_id: Optional[str] = Field(None, description=TZ_ID_DESC)
-    language: str = Field("en", description="Language code for output labels")
-    chart_style: Literal["north", "south"] = Field("south", description="Chart style: 'north' uses Sanskrit English nakshatra names, 'south' uses standard transliteration")
+    language: Language = Field("en", description="Language code for output labels")
+    chart_style: Literal["north", "south"] = Field("south", description="Chart style chosen by the client; names are the same for both")
 
     @model_validator(mode="after")
     def resolve_tz(self):

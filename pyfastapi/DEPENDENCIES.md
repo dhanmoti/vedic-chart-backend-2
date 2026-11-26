@@ -3,6 +3,19 @@
 ## Files
 - `requirements.in`: Source list of top-level dependencies.
 - `requirements.txt`: Fully pinned production dependencies.
+- `requirements-nodeps.txt`: Packages installed without their declared
+  dependencies (currently only PyJHora).
+
+## Installing
+```bash
+pip install -r requirements.txt
+pip install --no-deps -r requirements-nodeps.txt
+```
+
+PyJHora 5.0.6 pins desktop UI packages (PyQt6) and older versions of `numpy`,
+`pytz` and `timezonefinder`. The service does not need them, so `pip check` is
+expected to report those requirements as unmet. When upgrading PyJHora, check
+that its imports are covered by `requirements.in` and run the tests.
 
 ## Updating dependencies
 1. Update `requirements.in` with the desired top-level packages.
@@ -11,7 +24,7 @@
    python -m pip install --upgrade pip-tools
    pip-compile --generate-hashes --output-file requirements.txt requirements.in
    ```
-3. Ensure pinned versions remain compatible with the Docker runtime (Python 3.10
+3. Ensure pinned versions remain compatible with the Docker runtime (Python 3.13
    in `Dockerfile`), especially for packages like NumPy that have strict Python
    version constraints.
 4. If `pip-tools` is not available in the environment, update `requirements.txt`
@@ -24,6 +37,7 @@
   ```bash
   python -m pip install --upgrade pip-audit
   pip-audit -r requirements.txt
+  pip-audit --no-deps --disable-pip -r requirements-nodeps.txt
   ```
 - Record any remediation notes and follow up by updating `requirements.in` and
   re-pinning `requirements.txt`.

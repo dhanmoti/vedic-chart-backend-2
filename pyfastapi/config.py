@@ -1,5 +1,6 @@
 import atexit
 import contextlib
+import functools
 import logging
 import os
 
@@ -60,46 +61,7 @@ configure_ephemeris_path(ephe_path)
 # PyJHora varga option tuple format: (number_of_options, default_option).
 const.varga_option_dict[2] = (6, 2)
 
-# pyjhora 4.8.6 made drik.vaara() require `place`, but its own internal callers
-# (jhora/horoscope/main.py:135, jhora/panchanga/surya_sidhantha.py:43) were not
-# updated and still call vaara(jd) with no place, raising TypeError.
 from jhora.panchanga import drik
-
-_original_vaara = drik.vaara
-
-
-def _vaara_compat(jd, place=None, show_vedic_day=True):
-    if place is None:
-        return drik.civil_weekday(jd)
-    return _original_vaara(jd, place, show_vedic_day)
-
-
-drik.vaara = _vaara_compat
-
-# pyjhora 4.8.6's own sub_planet_list_1 dict (jhora/horoscope/main.py) references
-# resource keys that don't exist in its bundled lang files (e.g. 'yama_str' /
-# 'yama_short_str' instead of the actual 'yama_ghantaka_str' / 'yama_ghantaka_short_str').
-# Backfill known aliases after every resource-file load so missing keys resolve
-# to their real equivalent instead of raising KeyError deep inside pyjhora.
-from jhora import utils as jhora_utils
-
-_RESOURCE_KEY_ALIASES = {
-    "yama_str": "yama_ghantaka_str",
-    "yama_short_str": "yama_ghantaka_short_str",
-}
-
-_original_read_resource_messages = jhora_utils._read_resource_messages_from_file
-
-
-def _read_resource_messages_compat(message_file):
-    messages = _original_read_resource_messages(message_file)
-    for missing_key, fallback_key in _RESOURCE_KEY_ALIASES.items():
-        if missing_key not in messages and fallback_key in messages:
-            messages[missing_key] = messages[fallback_key]
-    return messages
-
-
-jhora_utils._read_resource_messages_from_file = _read_resource_messages_compat
 
 # pyjhora 4.7.0+ changed its default ayanamsa from LAHIRI to TRUE_PUSHYA (to match
 # their desktop JHora software). Pin it back to LAHIRI so chart output stays
@@ -111,22 +73,44 @@ jhora_utils._read_resource_messages_from_file = _read_resource_messages_compat
 # planet_list mid-request regardless of our setting, so forcing MEAN_NODE
 # globally is not reliably achievable without patching multiple internal
 # pyjhora call sites. Rahu/Ketu longitudes intentionally use TRUE_NODE.
-drik.set_ayanamsa_mode('LAHIRI')
+# Ref: PVR Narasimha Rao, "Vedic Astrology: An Integrated Approach" §1.3.13 ("We will use
+# Chitrapaksha/Lahiri ayanamsa"); Santhanam's notes to BPHS ch. 4.
+AYANAMSA_MODE = "LAHIRI"
+drik.set_ayanamsa_mode(AYANAMSA_MODE)
+
+# pyjhora 5 defaults to a true tropical dasha year. Pin the mean sidereal year,
+# which keeps Vimshottari and Ashtottari dates within a day of earlier releases
+# (5.x's "true sidereal" is computed per period and drifts by several days).
+const.dhasa_year_duration_default = const.DHASA_YEAR_DURATION.MEAN_SIDEREAL_YEAR
 
 # -------------------------------------------------------------------
 # Constants
 # -------------------------------------------------------------------
-_SIGN_TO_INDEX = {
-    "Aries": 0,
-    "Taurus": 1,
-    "Gemini": 2,
-    "Cancer": 3,
-    "Leo": 4,
-    "Virgo": 5,
-    "Libra": 6,
-    "Scorpio": 7,
-    "Sagittarius": 8,
-    "Capricorn": 9,
-    "Aquarius": 10,
-    "Pisces": 11,
-}
+# Languages the API offers. PyJHora ships more, but only these have been verified.
+SUPPORTED_LANGUAGES = ("en", "hi", "ta", "te", "ka", "ml")
+
+
+# -------------------------------------------------------------------
+# Per-thread engine state
+# -------------------------------------------------------------------
+def ensure_engine_state() -> None:
+    """Apply the ayanamsa and ephemeris path in the calling thread.
+
+    Swiss Ephemeris keeps the sidereal mode and the ephemeris path in thread-local
+    storage. The module-level calls above only reach the import thread, so a request
+    served from FastAPI's threadpool would otherwise fall back to Swiss Ephemeris'
+    default sidereal mode (Fagan-Bradley, about 0.88 degrees from Lahiri).
+    """
+    configure_ephemeris_path(ephe_path)
+    drik.set_ayanamsa_mode(AYANAMSA_MODE)
+
+
+def with_engine_state(func):
+    """Decorator for service entry points: set per-thread engine state before computing."""
+
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        ensure_engine_state()
+        return func(*args, **kwargs)
+
+    return wrapper

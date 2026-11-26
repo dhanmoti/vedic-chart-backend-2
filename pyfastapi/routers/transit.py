@@ -18,14 +18,14 @@ logger = logging.getLogger("uvicorn.error")
 GOCHAR_CACHE = HoroscopeCacheService(
     dataclasses.replace(
         CacheConfig.from_env(),
-        key_prefix=os.getenv("GOCHAR_CACHE_KEY_PREFIX", "gochar:v1"),
+        key_prefix=os.getenv("GOCHAR_CACHE_KEY_PREFIX", "gochar:v3"),
     )
 )
 
 VARSHA_CACHE = HoroscopeCacheService(
     dataclasses.replace(
         CacheConfig.from_env(),
-        key_prefix=os.getenv("VARSHA_CACHE_KEY_PREFIX", "varsha:v1"),
+        key_prefix=os.getenv("VARSHA_CACHE_KEY_PREFIX", "varsha:v3"),
     )
 )
 

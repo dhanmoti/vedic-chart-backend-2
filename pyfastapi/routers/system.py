@@ -3,6 +3,7 @@ from typing import Dict, List
 from fastapi import APIRouter
 from jhora import const
 
+from config import SUPPORTED_LANGUAGES
 from models import LanguageEntry, LanguagesResponse
 from routers.horoscope import CACHE_SERVICE
 
@@ -12,6 +13,7 @@ router = APIRouter()
 _LANGUAGES: List[LanguageEntry] = [
     LanguageEntry(code=code, name=name)
     for name, code in const.available_languages.items()
+    if code in SUPPORTED_LANGUAGES
 ]
 
 

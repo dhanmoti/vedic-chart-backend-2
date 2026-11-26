@@ -5,14 +5,14 @@ from jhora import const, utils
 from jhora.horoscope.chart import charts
 from jhora.panchanga import drik
 
-from config import suppress_third_party_stdout
-from helpers import ChartCleaner, NORTH_EN_NAKSHATRA_NAMES, NORTH_EN_PLANET_NAME_FIXES
+from config import suppress_third_party_stdout, with_engine_state
+from helpers import ChartCleaner
 from models import GocharRequest
 
 logger = logging.getLogger("uvicorn.error")
 
 
-def _load_names(language: str, chart_style: str) -> Dict:
+def _load_names(language: str) -> Dict:
     with suppress_third_party_stdout():
         utils.set_language(language)
 
@@ -34,10 +34,6 @@ def _load_names(language: str, chart_style: str) -> Dict:
         with suppress_third_party_stdout():
             utils.set_language("en")
 
-    if chart_style == "north" and language == "en":
-        planet_names = [NORTH_EN_PLANET_NAME_FIXES.get(n, n) for n in planet_names]
-        nak_names = list(NORTH_EN_NAKSHATRA_NAMES)
-
     return {"planet_names": planet_names, "nak_names": nak_names, "sign_names": sign_names}
 
 
@@ -54,6 +50,7 @@ def _get_natal_ref_signs(rasi_positions) -> tuple[int, int]:
     return lagna_sign, moon_sign
 
 
+@with_engine_state
 def build_gochar_payload(data: GocharRequest) -> Dict:
     year, month, day = [int(p) for p in data.dob.split("-")]
     hour, minute = [int(p) for p in data.time.split(":")]
@@ -77,7 +74,7 @@ def build_gochar_payload(data: GocharRequest) -> Dict:
     with suppress_third_party_stdout():
         retro_set = set(drik.planets_in_retrograde(transit_jd_local, transit_place))
 
-    names = _load_names(data.language, data.chart_style)
+    names = _load_names(data.language)
 
     transit_planets = []
     for planet_list_idx, planet_id in enumerate(drik.planet_list):

@@ -99,3 +99,12 @@ def test_panchanga_returns_expected_response_shape(app_client, panchanga_payload
     assert "sunset" in data
     assert ":" in data["sunrise"]
     assert ":" in data["sunset"]
+
+
+def test_panchanga_names_follow_the_requested_language(app_client, panchanga_payload):
+    english = app_client.post("/panchanga", json=panchanga_payload).json()["data"]
+    hindi = app_client.post("/panchanga", json={**panchanga_payload, "language": "hi"}).json()["data"]
+
+    for field in ("vaara", "tithi", "nakshatra", "yoga", "karana", "lunar_month"):
+        assert english[field].isascii(), field
+        assert not hindi[field].isascii(), field

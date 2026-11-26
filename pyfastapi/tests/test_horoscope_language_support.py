@@ -302,3 +302,20 @@ def test_horoscope_non_english_division_planet_names_match_d1(app_client, langua
         assert p["symbol"] == d1_symbols[p["id"]], (
             f"lang={language} D9 planet {p['id']} symbol mismatch"
         )
+
+
+def test_languages_endpoint_lists_only_supported_languages(app_client):
+    response = app_client.get("/languages")
+
+    assert response.status_code == 200
+    assert {entry["code"] for entry in response.json()["data"]} == {"en", "hi", "ta", "te", "ka", "ml"}
+
+
+@pytest.mark.parametrize("language", ["bn", "mr", "xx", ""])
+def test_unsupported_language_falls_back_to_english(app_client, hi_payload, language):
+    response = app_client.post("/horoscope", json={**hi_payload, "language": language})
+
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["meta"]["language"] == "en"
+    assert data["planets"][0]["name"] == "Sun"

@@ -3,6 +3,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+from jhora import utils
 
 import routers.horoscope as horoscope_router
 import services.horoscope_service as horoscope_service
@@ -128,7 +129,7 @@ def test_horoscope_rejects_invalid_chart_style(app_client, valid_payload):
 
 
 def test_horoscope_returns_500_on_chart_generation_failure(app_client, valid_payload):
-    with patch.object(horoscope_service, "Horoscope", side_effect=RuntimeError("boom")):
+    with patch.object(horoscope_service.charts, "divisional_chart", side_effect=RuntimeError("boom")):
         response = app_client.post("/horoscope", json=valid_payload)
 
     assert response.status_code == 500
@@ -203,43 +204,19 @@ def test_horoscope_returns_expected_response_shape(app_client, valid_payload):
     karaka_values = {p["jaimini_karaka"] for p in planets}
     assert None in karaka_values
     assert any(v is not None for v in karaka_values)
-    assert any(p["jaimini_karaka"] is not None for p in data["divisions"]["D9"]["planets"])
-    assert all(p["jaimini_karaka"] is None for p in data["divisions"]["D2"]["planets"])
+    # Rasi-chart karakas are carried into every varga, D2 included (PVR §7.3.6, §8.2).
+    rasi_karakas = [p["jaimini_karaka"] for p in planets]
+    for code in ("D2", "D9"):
+        assert [p["jaimini_karaka"] for p in data["divisions"][code]["planets"]] == rasi_karakas
 
 
-def test_horoscope_north_style_fixes_rahu_ketu_names(app_client, valid_payload):
-    payload = {**valid_payload, "chart_style": "north", "language": "en"}
-    response = app_client.post("/horoscope", json=payload)
+@pytest.mark.parametrize("chart_style", ["north", "south"])
+def test_horoscope_english_names_come_from_pyjhora_for_both_styles(app_client, valid_payload, chart_style):
+    response = app_client.post("/horoscope", json={**valid_payload, "chart_style": chart_style})
     assert response.status_code == 200
 
-    planets = response.json()["data"]["planets"]
-    rahu = planets[7]
-    ketu = planets[8]
-    assert rahu["name"] == "Rahu", f"Expected 'Rahu', got '{rahu['name']}'"
-    assert ketu["name"] == "Ketu", f"Expected 'Ketu', got '{ketu['name']}'"
-
-
-def test_horoscope_north_style_uses_sanskrit_nakshatra_names(app_client, valid_payload):
-    payload = {**valid_payload, "chart_style": "north", "language": "en"}
-    response = app_client.post("/horoscope", json=payload)
-    assert response.status_code == 200
-
-    planets = response.json()["data"]["planets"]
-    all_nakshatra_names = {p["nakshatra"]["name"] for p in planets}
-    # None of the Tamil-style names should appear in north style
-    tamil_style = {"Aswini", "Karthigai", "Mrigasheesham", "Thiruvaathirai", "Punarpoosam"}
-    assert not all_nakshatra_names.intersection(tamil_style), (
-        f"Tamil names found in north style: {all_nakshatra_names.intersection(tamil_style)}"
-    )
-
-
-def test_horoscope_south_style_preserves_tamil_rahu_ketu(app_client, valid_payload):
-    payload = {**valid_payload, "chart_style": "south", "language": "en"}
-    response = app_client.post("/horoscope", json=payload)
-    assert response.status_code == 200
-
-    planets = response.json()["data"]["planets"]
-    rahu = planets[7]
-    ketu = planets[8]
-    assert rahu["name"] == "Raagu", f"Expected 'Raagu', got '{rahu['name']}'"
-    assert ketu["name"] == "Kethu", f"Expected 'Kethu', got '{ketu['name']}'"
+    data = response.json()["data"]
+    assert data["meta"]["chart_style"] == chart_style
+    assert [data["planets"][7]["name"], data["planets"][8]["name"]] == ["Rahu", "Ketu"]
+    nakshatras = {planet["nakshatra"]["name"] for planet in data["planets"]}
+    assert nakshatras <= set(utils.NAKSHATRA_LIST)

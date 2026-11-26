@@ -18,7 +18,7 @@ logger = logging.getLogger("uvicorn.error")
 CACHE_SERVICE = HoroscopeCacheService(
     dataclasses.replace(
         CacheConfig.from_env(),
-        key_prefix=os.getenv("ASHTAKAVARGA_CACHE_KEY_PREFIX", "ashtakavarga:v1"),
+        key_prefix=os.getenv("ASHTAKAVARGA_CACHE_KEY_PREFIX", "ashtakavarga:v3"),
     )
 )
 

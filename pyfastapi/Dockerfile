@@ -6,10 +6,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-COPY requirements.txt ./requirements.txt
-RUN pip wheel --no-cache-dir --wheel-dir /wheels -r requirements.txt
+COPY requirements.txt requirements-nodeps.txt ./
+RUN pip wheel --no-cache-dir --wheel-dir /wheels -r requirements.txt \
+    && pip wheel --no-cache-dir --no-deps --wheel-dir /wheels -r requirements-nodeps.txt
 
-COPY main.py config.py dependencies.py models.py cache_service.py helpers.py limiter.py requirements.txt ./
+COPY main.py config.py dependencies.py models.py cache_service.py helpers.py limiter.py requirements.txt requirements-nodeps.txt ./
 COPY routers ./routers
 COPY services ./services
 COPY jhora ./jhora
@@ -23,8 +24,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 COPY --from=builder /wheels /wheels
-COPY --from=builder /app/requirements.txt ./requirements.txt
+COPY --from=builder /app/requirements.txt /app/requirements-nodeps.txt ./
 RUN pip install --no-cache-dir --no-index --find-links=/wheels -r requirements.txt \
+    && pip install --no-cache-dir --no-index --find-links=/wheels --no-deps -r requirements-nodeps.txt \
     && rm -rf /wheels
 
 COPY --from=builder /app/main.py ./main.py

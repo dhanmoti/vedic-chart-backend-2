@@ -4,7 +4,7 @@ from jhora import const, utils
 from jhora.horoscope.chart import arudhas, charts
 from jhora.panchanga import drik
 
-from config import suppress_third_party_stdout
+from config import suppress_third_party_stdout, with_engine_state
 from helpers import ChartCleaner
 from models import HoroscopeRequest
 
@@ -21,6 +21,7 @@ def _sign_names(language: str) -> List[str]:
     return names
 
 
+@with_engine_state
 def build_arudha_payload(data: HoroscopeRequest) -> Dict:
     year, month, day = [int(p) for p in data.dob.split("-")]
     hour, minute = [int(p) for p in data.time.split(":")]
@@ -57,7 +58,7 @@ def build_arudha_payload(data: HoroscopeRequest) -> Dict:
             "sign": sign_names[int(sign_idx)],
             "sign_symbol": const._zodiac_symbols[int(sign_idx)],
         }
-        for label, sign_idx in zip(_GRAHA_LABELS, graha_arudhas)
+        for label, (sign_idx, _longitude) in zip(_GRAHA_LABELS, graha_arudhas)
     ]
 
     return {
